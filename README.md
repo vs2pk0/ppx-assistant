@@ -2,7 +2,13 @@
 
 一个基于 LSPosed 的皮皮虾增强模块。
 
-当前维护：[lilei / vs2pk0](https://github.com/vs2pk0) · [项目仓库](https://github.com/vs2pk0/ppx-assistant) · [问题反馈](https://github.com/vs2pk0/ppx-assistant/issues)
+当前维护：[我的馬眼会发光 / vs2pk0](https://github.com/vs2pk0) · [项目仓库](https://github.com/vs2pk0/ppx-assistant) · [问题反馈](https://github.com/vs2pk0/ppx-assistant/issues)
+
+## 设置与支持
+
+设置已按下载保存、广告过滤、评论发布、浏览播放、自动操作、界面资料分类，支持全局搜索。
+关于页列出适配版本（目前仅支持皮皮虾 6.2.0），提供 [酷安主页](https://www.coolapk.com/u/270261) 和赞赏入口。
+支付宝可跳转收款金额输入页；微信请保存收款码后打开扫一扫，从相册识别。赞赏金额由用户在支付应用中填写并确认。
 
 ## 项目说明
 

@@ -6,9 +6,7 @@ import com.akari.ppx.data.Const.CATEGORY_TYPES
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.utils.hideIcon
 
-val prefTabs = listOf("主页", "辅助", "自动", "杂项", "关于")
-
-val prefItems: List<List<PrefItem?>> = prefTabs.mapIndexed { index, _ ->
+val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
     when (Page.fromIndex(index)) {
         Page.PURITY -> {
             listOf(
@@ -596,3 +594,33 @@ class ChannelListItem(
 ) : PrefItem
 
 object ItemDivider : PrefItem
+
+// 分类只组织展示，保持原有配置键与 Hook 配置兼容。
+data class SettingsCategory(val title: String, val description: String, val items: List<PrefItem>)
+
+fun PrefItem.settingKey(): String = when (this) {
+    is SwitchItem -> key
+    is EditItem -> key
+    is ListItem -> key
+    is CheckBoxListItem -> key
+    is ChannelListItem -> key
+    else -> ""
+}
+
+val settingsCategories: List<SettingsCategory> by lazy {
+    val all = prefItems.flatten().filterNotNull().filter { it !== ItemDivider }
+    val downloads = setOf("save_image", "save_video", "save_audio", "copy_item", "remove_download_restrictions")
+    val comments = setOf("comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_1080p_limit", "unlock_highlight", "unlock_emoji_limit", "unlock_send_god_limit", "enable_show_location_label")
+    val interfaceKeys = prefItems[3].filterNotNull().map { it.settingKey() }.toSet() + setOf("modify_channels", "default_channel", "enable_double_layout_style", "enable_old_god_icon_style", "use_feed_footer_new_style", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
+    val autoKeys = prefItems[2].filterNotNull().map { it.settingKey() }.toSet()
+    val filterKeys = prefItems[0].filterNotNull().map { it.settingKey() }.toSet() - downloads - interfaceKeys
+    val groups = listOf(
+        Triple("下载与保存", "图片、动图、视频、音频与文字", downloads),
+        Triple("广告与内容过滤", "去广告、去红点、帖子与评论过滤", filterKeys),
+        Triple("评论与发布", "评论颜色、楼中楼视频、发布限制", comments),
+        Triple("浏览与播放", "视频倍速、弹幕、时间与用户信息", all.map { it.settingKey() }.toSet() - downloads - filterKeys - comments - interfaceKeys - autoKeys),
+        Triple("自动操作", "自动浏览、点赞、评论与插眼", autoKeys),
+        Triple("界面与个人资料", "频道布局、消息角标、本机资料与图标", interfaceKeys)
+    )
+    groups.map { (title, description, keys) -> SettingsCategory(title, description, all.filter { it.settingKey() in keys }) }
+}

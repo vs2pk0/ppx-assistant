@@ -10,8 +10,8 @@ plugins {
 val properties = Properties()
 properties.load(project.rootProject.file("local.properties").inputStream())
 
-val verCode = 20260914
-val verName = "26.09.12-r3"
+val verCode = 20260915
+val verName = "26.09.12-r4"
 
 android {
     compileSdk = 36

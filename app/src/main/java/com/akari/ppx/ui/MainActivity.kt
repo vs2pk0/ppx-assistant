@@ -9,13 +9,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
@@ -26,12 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akari.ppx.ui.screen.PreferenceScreen
 import com.akari.ppx.ui.theme.BaseTheme
-import kotlinx.coroutines.launch
 import com.akari.ppx.BuildConfig.APPLICATION_ID
 import com.akari.ppx.R
 import com.akari.ppx.data.FrameworkScopeState
 import com.akari.ppx.data.HookStatusImpl
-import com.akari.ppx.data.prefTabs
 import com.akari.ppx.ui.screen.AboutScreen
 import com.akari.ppx.utils.VersionChecker.targetVersion
 import com.akari.ppx.utils.startPPX
@@ -58,9 +53,9 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !darkTheme
                     }
                 }
-                val pager = rememberPagerState(pageCount = { prefTabs.size })
-                val coroutineScope = rememberCoroutineScope()
-                var query by androidx.compose.runtime.remember { mutableStateOf("") }
+                var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1) }
+                var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+                androidx.activity.compose.BackHandler(selected != -1) { selected = -1 }
                 Scaffold(
                     modifier = Modifier.background(MaterialTheme.colors.background).safeDrawingPadding(),
                     backgroundColor = MaterialTheme.colors.background,
@@ -84,35 +79,49 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { padding ->
                     Column(Modifier.fillMaxSize().padding(padding)) {
-                        TabRow(selectedTabIndex = pager.currentPage,
-                            backgroundColor = MaterialTheme.colors.background,
-                            contentColor = MaterialTheme.colors.primary, divider = {}) {
-                            prefTabs.forEachIndexed { index, title ->
-                                Tab(selected = pager.currentPage == index,
-                                    onClick = { coroutineScope.launch { pager.animateScrollToPage(index) } },
-                                    text = { Text(title, fontWeight = FontWeight.SemiBold) })
-                            }
-                        }
-                        HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { index ->
-                            Column(Modifier.fillMaxSize()) {
-                                if (index == 0 && query.isBlank()) {
-                                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                                        backgroundColor = MaterialTheme.colors.primary.copy(alpha = .08f), elevation = 0.dp) {
-                                        Column(Modifier.padding(18.dp)) {
-                                            Text(if (isActiveState.value) "框架已启用助手" else "等待框架启用",
-                                                fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary)
-                                            Spacer(Modifier.height(5.dp))
-                                            Text("助手 ${com.akari.ppx.BuildConfig.VERSION_NAME}  ·  皮皮虾 $targetVersion",
-                                                style = MaterialTheme.typography.body2)
-                                            Text("修改后重启皮皮虾生效；启动提示可确认本次加载。",
-                                                style = MaterialTheme.typography.caption,
-                                                color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
+                        if (selected != -1) TextButton(onClick = { selected = -1 }) { Text("‹ 返回功能分类") }
+                        if (query.isNotBlank()) {
+                            PreferenceScreen(0, rememberLazyListState(), query)
+                        } else if (selected == com.akari.ppx.data.settingsCategories.size) {
+                            AboutScreen(isActiveState.value)
+                        } else if (selected >= 0) {
+                            PreferenceScreen(selected, rememberLazyListState())
+                        } else {
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                item {
+                                    Card(backgroundColor = MaterialTheme.colors.primary.copy(alpha = .08f), elevation = 0.dp,
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+                                        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                                            Text(if (isActiveState.value) "框架已启用助手" else "等待框架启用", fontWeight = FontWeight.Bold)
+                                            Text("助手 ${com.akari.ppx.BuildConfig.VERSION_NAME} · 皮皮虾 $targetVersion")
+                                            Text("目前仅适配皮皮虾 6.2.0；修改后重启生效。", style = MaterialTheme.typography.caption)
                                         }
                                     }
                                 }
-                                if (index == 4 && query.isBlank()) AboutScreen(isActiveState.value)
-                                else PreferenceScreen(index, rememberLazyListState(), query)
+                                com.akari.ppx.data.settingsCategories.forEachIndexed { index, category ->
+                                    item {
+                                        Card(onClick = { selected = index }, elevation = 0.dp,
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
+                                            Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                                                Text(category.title + "  ›", fontWeight = FontWeight.Bold)
+                                                Text(category.description, style = MaterialTheme.typography.body2,
+                                                    color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
+                                            }
+                                        }
+                                    }
+                                }
+                                item {
+                                    Card(onClick = { selected = com.akari.ppx.data.settingsCategories.size }, elevation = 0.dp,
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
+                                        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                                            Text("关于与支持  ›", fontWeight = FontWeight.Bold)
+                                            Text("作者主页 · 版本适配 · 赞赏支持", style = MaterialTheme.typography.body2)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -132,7 +132,7 @@ fun PreferenceScreen(
     state: LazyListState,
     query: String = ""
 ) {
-    val visible = (if (query.isBlank()) prefItems[index] else prefItems.take(4).flatten()).filter { item ->
+    val visible = (if (query.isBlank()) settingsCategories[index].items else settingsCategories.flatMap { it.items }).filter { item ->
         query.isBlank() || when (item) {
             is SwitchItem -> "${item.title} ${item.summary}".contains(query, true)
             is TextItem -> "${item.title} ${item.summary}".contains(query, true)
@@ -152,33 +152,11 @@ fun PreferenceScreen(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         item {
-            Text(if (query.isBlank()) listOf("净化与下载", "发布与浏览", "自动操作", "界面与个性化")[index]
+            Text(if (query.isBlank()) settingsCategories[index].title
                 else "${visible.size} 项匹配功能",
                 Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold)
         }
         visible.map { item ->
-            val key = when (item) {
-                is SwitchItem -> item.key
-                is ListItem -> item.key
-                is ChannelListItem -> item.key
-                else -> null
-            }
-            val section = when (key) {
-                "remove_ads" -> "广告与干扰"
-                "remove_comments" -> "内容过滤"
-                "modify_channels" -> "频道管理"
-                "comment_text_color" -> "发布评论"
-                "unlock_danmaku" -> "浏览与互动"
-                "prevent_mistouch" -> "播放与显示"
-                "auto_comment" -> "评论与插眼"
-                "customize" -> "个人资料 · 仅本机显示"
-                else -> null
-            }
-            if (section != null && query.isBlank()) item {
-                Text(section, Modifier.padding(top = 16.dp, bottom = 8.dp),
-                    style = MaterialTheme.typography.subtitle2, fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.primary)
-            }
 
             when (item) {
                 is TextItem -> item {
@@ -249,7 +227,6 @@ fun PreferenceScreen(
                 ItemDivider -> item {
                     Divider()
                 }
-                null -> {}
             }
         }
     }
