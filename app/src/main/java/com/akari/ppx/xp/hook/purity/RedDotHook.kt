@@ -3,6 +3,7 @@
 package com.akari.ppx.xp.hook.purity
 
 import android.os.Message
+import com.akari.ppx.data.XPrefs
 import com.akari.ppx.utils.findClass
 import com.akari.ppx.utils.hookBeforeMethod
 import com.akari.ppx.utils.Log
@@ -21,7 +22,8 @@ class RedDotHook : SwitchHook("remove_red_dots") {
                 param.args[1] = 0
             }
         }
-        hookMainActivityRedDots()
+        // Explicit message count styling takes precedence over hiding the message badge.
+        if (!XPrefs<Boolean>("modify_message_counts")) hookMainActivityRedDots()
         "com.sup.android.m_mine.view.subview.MyProfileHeaderLayout".hookBeforeMethod(
             cl,
             "a",

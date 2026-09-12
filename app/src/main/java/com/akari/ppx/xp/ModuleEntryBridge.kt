@@ -25,6 +25,14 @@ object ModuleEntryBridge {
     private val installedHookLoaders =
         Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
 
+    private val installedFeatures = ConcurrentHashMap.newKeySet<String>()
+    fun isFeatureInstalled(key: String) = key in installedFeatures
+
+    @Volatile var installedCount = 0
+        private set
+    @Volatile var failedCount = 0
+        private set
+
     @JvmStatic
     fun onLegacyLoadPackage(packageName: String, classLoader: ClassLoader) {
         HookRuntime.useLegacy()
@@ -60,42 +68,36 @@ object ModuleEntryBridge {
         }
         cl = classLoader
         Log.i("Entry loaded for $packageName")
-        arrayListOf<BaseHook>().let { hooks ->
-            safeModeApplicationClass?.hookBeforeMethod(
-                "attachBaseContext",
-                Context::class.java
-            ) { param ->
-                Log.i("Entry attachBaseContext")
-                with(param.args[0] as Context) {
-                    runCatching { Init(this) }.onFailure(Log::e)
-                    runCatching {
-                        packageManager.getApplicationInfo(APPLICATION_ID, 0).run {
-                            DexFile(sourceDir).entries()
-                        }.asSequence().filter {
-                            it.startsWith(BaseHook::class.java.`package`!!.name)
-                        }.mapNotNull { className ->
-                            runCatching { Class.forName(className) }.onFailure(Log::e).getOrNull()
-                        }.filter {
-                            !it.isInterface && BaseHook::class.java.isAssignableFrom(it) && it != SwitchHook::class.java
-                        }.forEach { hookClass ->
-                            runCatching {
-                                if (hooks.none { it.javaClass == hookClass }) {
-                                    hooks += hookClass.new() as BaseHook
-                                }
-                            }.onFailure(Log::e)
-                        }
-                        Log.i("Entry hook scan size=${hooks.size}")
-                        installHooksOnce(packageName, classLoader, hooks, "attachBaseContext")
-                    }.onFailure(Log::e)
+        val hooks = arrayListOf<BaseHook>()
+        fun ensureHooks(context: Context, source: String) {
+            if (System.identityHashCode(classLoader) in installedHookLoaders) return
+            runCatching {
+                if (hooks.isEmpty()) {
+                    Init(context)
+                    val info = context.packageManager.getApplicationInfo(APPLICATION_ID, 0)
+                    val dex = DexFile(info.sourceDir)
+                    try {
+                        dex.entries().asSequence()
+                            .filter { it.startsWith(BaseHook::class.java.`package`!!.name) }
+                            .map { Class.forName(it) }
+                            .filter { !it.isInterface && BaseHook::class.java.isAssignableFrom(it) && it != SwitchHook::class.java }
+                            .forEach { type ->
+                                if (hooks.none { it.javaClass == type }) hooks += type.new() as BaseHook
+                            }
+                    } finally { dex.close() }
                 }
-            }
-            Log.i("Entry mainActivityClass=${mainActivityClass?.name}")
-            mainActivityClass?.hookBeforeMethod("onCreate", Bundle::class.java) {
-                installHooksOnce(packageName, classLoader, hooks, "MainActivity.onCreate")
-            }
-            mainActivityClass?.hookBeforeMethod("onResume") {
-                installHooksOnce(packageName, classLoader, hooks, "MainActivity.onResume")
-            }
+                installHooksOnce(packageName, classLoader, hooks, source)
+            }.onFailure(Log::e)
+        }
+        safeModeApplicationClass?.hookBeforeMethod("attachBaseContext", Context::class.java) { param ->
+            ensureHooks(param.args[0] as Context, "attachBaseContext")
+        }
+        // Recover if the framework delivered package initialization after application attachment.
+        mainActivityClass?.hookBeforeMethod("onCreate", Bundle::class.java) { param ->
+            ensureHooks((param.thisObject as Context).applicationContext, "MainActivity.onCreate")
+        }
+        mainActivityClass?.hookBeforeMethod("onResume") { param ->
+            ensureHooks((param.thisObject as Context).applicationContext, "MainActivity.onResume")
         }
     }
 
@@ -105,6 +107,11 @@ object ModuleEntryBridge {
         hooks: List<BaseHook>,
         source: String
     ) {
+        // An early activity callback must not permanently mark an empty scan as installed.
+        if (hooks.isEmpty()) {
+            Log.i("Entry defer empty hook scan from $source")
+            return
+        }
         if (!installedHookLoaders.add(System.identityHashCode(classLoader))) {
             Log.d("Entry skip duplicated hook install for $packageName from $source")
             return
@@ -117,11 +124,14 @@ object ModuleEntryBridge {
                     is SwitchHook -> {
                         XPrefs<Boolean>(hook.key).check(true) {
                             hook.onHook()
+                            installedFeatures.add(hook.key)
+                            installedCount++
                         }
                     }
-                    else -> hook.onHook()
+                    else -> { hook.onHook(); installedCount++ }
                 }
             }.onFailure {
+                failedCount++
                 Log.e("${hook.javaClass.name} init failed")
                 Log.e(it)
             }

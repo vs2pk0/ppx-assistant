@@ -8,8 +8,8 @@ import com.akari.ppx.utils.callMethodOrNull
 import com.akari.ppx.utils.callMethodOrNullAs
 import com.akari.ppx.utils.hookBeforeMethod
 import com.akari.ppx.utils.replaceMethod
-import com.akari.ppx.xp.Init.absFeedCellClass
 import com.akari.ppx.xp.Init.cl
+import com.akari.ppx.xp.Init.commentResponseClass
 import com.akari.ppx.xp.Init.feedResponse
 import com.akari.ppx.xp.Init.feedResponseClass
 import com.akari.ppx.xp.Init.splashAdClass
@@ -23,17 +23,19 @@ class AdHook : SwitchHook("remove_ads") {
         "com.sup.android.mi.feed.repo.bean.ad.AdFeedCell".replaceMethod(cl, "getAdInfo") { null }
         hookFeedAds()
         hookCommentAds()
-        "com.sup.android.m_comment.view.CommentAdapter".hookBeforeMethod(
-            cl,
-            "b",
-            List::class.java,
-            Boolean::class.javaPrimitiveType!!
-        ) { param ->
-            @Suppress("UNCHECKED_CAST")
-            val dockerList = param.args.getOrNull(0) as? MutableList<Any?> ?: return@hookBeforeMethod
-            dockerList.indices.reversed().forEach { index ->
-                if (dockerList[index].isCommentAdDockerData()) {
-                    dockerList.removeAt(index)
+        // 6.2.0 uses b for comments and a for the additional item section.
+        listOf("a", "b").forEach { method ->
+            "com.sup.android.m_comment.view.CommentAdapter".hookBeforeMethod(
+                cl,
+                method,
+                List::class.java,
+                Boolean::class.javaPrimitiveType!!
+            ) { param ->
+                val dockerList = param.args.getOrNull(0) as? List<*> ?: return@hookBeforeMethod
+                val filtered = dockerList.filterNot { it.isCommentAdDockerData() }
+                if (filtered.size != dockerList.size) {
+                    Log.i("AdHook comment adapter removed=${dockerList.size - filtered.size}")
+                    param.args[0] = filtered
                 }
             }
         }
@@ -80,22 +82,27 @@ class AdHook : SwitchHook("remove_ads") {
             feeds.indices.reversed().forEach { index ->
                 if (feeds[index].isMainFeedAdCell()) {
                     feeds.removeAt(index)
+                    Log.i("AdHook removed feed ad")
                 }
             }
         }
     }
 
     private fun hookCommentAds() {
+        // Kotlin metadata calls this CommentListResponse, but the actual 6.2.0
+        // DEX class is obfuscated. Reuse Init's field-based resolver.
+        val responseClass = commentResponseClass ?: return
         "com.sup.android.m_comment.viewmodel.CommentListViewModel".hookBeforeMethod(
             cl,
             "a",
-            "com.sup.android.mi.feed.repo.response.CommentListResponse"
+            responseClass
         ) { param ->
             val response = param.args.firstOrNull() ?: return@hookBeforeMethod
             val cells = response.callMethodOrNullAs<ArrayList<Any?>>("b") ?: return@hookBeforeMethod
             cells.indices.reversed().forEach { index ->
                 if (cells[index].isCommentAdFeedCell()) {
                     cells.removeAt(index)
+                    Log.i("AdHook removed comment ad")
                 }
             }
         }
@@ -110,16 +117,18 @@ class AdHook : SwitchHook("remove_ads") {
 
     private fun Any?.isCommentAdFeedCell(): Boolean {
         if (this == null) return false
-        if (javaClass.name == COMMENT_AD_MODEL_CLASS) return true
-        if (javaClass.name != AD_FEED_CELL_CLASS) return false
-        val adInfo = callMethodOrNull("getAdInfo") ?: return false
-        val adModel = adInfo.callMethodOrNull("getAdModel") ?: return false
-        return adModel.javaClass.name == COMMENT_AD_MODEL_CLASS
+        // getAdInfo is deliberately hooked to return null. Identify the cell by
+        // its type so that this fallback cannot disable comment filtering.
+        return generateSequence(javaClass as Class<*>?) { it.superclass }.any {
+            it.name == COMMENT_AD_MODEL_CLASS || it.name == AD_FEED_CELL_CLASS
+        }
     }
 
     private fun Any?.isMainFeedAdCell(): Boolean {
         if (this == null) return false
-        return javaClass.name in MAIN_FEED_AD_CELL_CLASSES
+        return generateSequence(javaClass as Class<*>?) { it.superclass }.any {
+            it.name in MAIN_FEED_AD_CELL_CLASSES
+        }
     }
 
     private companion object {

@@ -725,8 +725,10 @@ class VideoHook : SwitchHook("save_video") {
             entry?.callMethod("setUrl", url)
         }
         runCatching {
-            val uri = extractVideoUri(url)
-            videoModel.callMethod("setUri", uri)
+            // CDN playback URLs use /video/tos/... and contain no video ID.
+            // Keep the model's original ID instead of treating a valid URL as an error.
+            val uri = extractVideoUri(url) ?: oldUri
+            if (!uri.isNullOrBlank()) videoModel.callMethod("setUri", uri)
             Log.d(
                 "VideoHook[$tag] rewrite done newUri=${shortValue(uri)} " +
                         "newFirstUrl=${shortValue(firstUrl(videoModel), 180)}"
@@ -734,13 +736,12 @@ class VideoHook : SwitchHook("save_video") {
         }.onFailure(Log::e)
     }
 
-    private fun extractVideoUri(url: String): String {
+    private fun extractVideoUri(url: String): String? {
         val marker = "/mp4/"
         val index = url.lastIndexOf(marker)
-        if (index < 0) {
-            throw IllegalArgumentException("VideoHook uri marker missing")
-        }
-        return url.substring(index + marker.length)
+        if (index < 0) return null
+        return url.substring(index + marker.length).substringBefore('?').substringBefore('#')
+            .takeIf { it.isNotBlank() && '/' !in it }
     }
 
     private fun httpGet(url: String): String {

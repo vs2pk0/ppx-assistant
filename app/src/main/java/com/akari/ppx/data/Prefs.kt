@@ -26,7 +26,7 @@ object Prefs {
 
     inline fun <reified T> get(key: String, defaultValue: T? = null): T? =
         runBlocking(scope.coroutineContext) {
-            dsData.first()[getPrefsKey<T>(key)] ?: defaultValue
+            dataStore.data.first()[getPrefsKey<T>(key)] ?: defaultValue
         }
 
     inline fun <reified T> set(key: String, value: T) {
@@ -47,7 +47,7 @@ object Prefs {
 
     fun syncMirror() {
         runBlocking(scope.coroutineContext) {
-            ModuleSharedPrefs.syncAll(dsData.first())
+            ModuleSharedPrefs.syncAll(dataStore.data.first())
         }
     }
 
@@ -55,7 +55,7 @@ object Prefs {
         val remote = sharedPreferences ?: return
         runBlocking(scope.coroutineContext) {
             val editor = remote.edit().clear()
-            dsData.first().asMap().forEach { (key, value) ->
+            dataStore.data.first().asMap().forEach { (key, value) ->
                 when (value) {
                     is String -> editor.putString(key.name, value)
                     is Boolean -> editor.putBoolean(key.name, value)

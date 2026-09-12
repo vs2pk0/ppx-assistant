@@ -10,8 +10,8 @@ plugins {
 val properties = Properties()
 properties.load(project.rootProject.file("local.properties").inputStream())
 
-val verCode = 20260503
-val verName = "26.05.03"
+val verCode = 20260914
+val verName = "26.09.12-r3"
 
 android {
     compileSdk = 36
@@ -26,6 +26,7 @@ android {
 
         versionCode = verCode
         versionName = verName
+        testInstrumentationRunner = "com.akari.ppx.test.PreferenceInstrumentation"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -101,6 +102,7 @@ dependencies {
     implementation(Google.android.material)
     implementation(Libs.reorderable)
     implementation(Libs.mp4parser)
+    testImplementation("junit:junit:4.13.2")
 }
 
 tasks.withType<KotlinCompile>().configureEach {

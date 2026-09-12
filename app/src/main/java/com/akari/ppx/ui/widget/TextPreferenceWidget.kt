@@ -1,14 +1,14 @@
 package com.akari.ppx.ui.widget
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.structuralEqualityPolicy
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.akari.ppx.data.Preference
-import com.akari.ppx.utils.checkUnless
 
 @Composable
 fun TextPreferenceWidget(
@@ -17,23 +17,24 @@ fun TextPreferenceWidget(
     onClick: () -> Unit = { },
     trailing: @Composable (() -> Unit)? = null
 ) {
-    val enabled = compositionLocalOf(structuralEqualityPolicy()) { true }.current && preference.enabled
+    val enabled = preference.enabled
     CompositionLocalProvider(LocalContentAlpha provides if (enabled) ContentAlpha.high else ContentAlpha.disabled) {
-        ListItem(
-            text = {
-                Text(
-                    text = preference.title,
-                    maxLines = if (preference.singleLineTitle) 1 else Int.MAX_VALUE
-                )
-            },
-            secondaryText = (summary ?: preference.summary)?.checkUnless("") {
-                {
-                    Text(text = this)
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 40.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            preference.icon?.let { it(); Spacer(Modifier.width(12.dp)) }
+            Column(Modifier.weight(1f)) {
+                Text(preference.title, style = MaterialTheme.typography.body1,
+                    maxLines = if (preference.singleLineTitle) 1 else Int.MAX_VALUE)
+                (summary ?: preference.summary)?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(it, style = MaterialTheme.typography.body2,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = if (enabled) .6f else .38f))
                 }
-            },
-            icon = preference.icon,
-            modifier = Modifier.clickable(onClick = { if (enabled) onClick() }),
-            trailing = trailing,
-        )
+            }
+            trailing?.let { Spacer(Modifier.width(12.dp)); it() }
+        }
     }
 }

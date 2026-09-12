@@ -2,8 +2,6 @@
 
 package com.akari.ppx.xp.hook.misc
 
-import com.akari.ppx.data.Const.APP_NAME
-import com.akari.ppx.data.Const.AUTHOR_ID
 import com.akari.ppx.data.XPrefs
 import com.akari.ppx.utils.*
 import com.akari.ppx.xp.Init.cl
@@ -36,22 +34,15 @@ class InfoHook : BaseHook {
             "com.sup.android.mi.usercenter.model.UserInfo",
             Int::class.java
         ) { param ->
-            val userInfo = param.args[0]
+            val userInfo = param.args[0] ?: return@hookBeforeMethod
             val certifyInfoClass =
                 "com.sup.android.mi.usercenter.model.UserInfo\$CertifyInfo".findClass(cl)
-            if (userInfo.getLongField("id") == AUTHOR_ID) {
-                certifyInfoClass.new().apply {
-                    callMethod("setCertifyType", 2)
-                    callMethod("setDescription", "${APP_NAME}开发者")
-                }.let {
-                    userInfo.setObjectField("certifyInfo", it)
-                }
-            }
             isCustomize.check(true) {
                 "com.sup.android.module.usercenter.UserCenterService".findClass(cl)
                     .callStaticMethod("getInstance")
-                    ?.callMethod("getMyUserInfo")?.getObjectFieldAs<String>("name")
-                    .check(userInfo.getObjectFieldAs("name")) {
+                    ?.callMethod("getMyUserInfo")?.getLongFieldOrNull("id")
+                    .takeIf { it != null && it > 0 }
+                    .check(userInfo.getLongField("id")) {
                         if (isEnterBlackHouse) {
                             userInfo.setObjectField("punishmentList", arrayListOf<Any>().apply {
                                 "com.sup.android.mi.usercenter.model.UserInfo\$Punishment".findClass(
@@ -92,10 +83,10 @@ class InfoHook : BaseHook {
         }
         "com.google.gson.Gson".findClass(cl)
             .hookAfterMethod("fromJson", String::class.java, Class::class.java) { param ->
-                if (isModifyMsgCounts && (param.args[1] as Class<*>).name == "com.sup.android.m_message.data.t") {
-                    param.result.getObjectField("data")?.getObjectFieldAs<List<*>>("count_map")
+                if (isModifyMsgCounts && (param.args[1] as Class<*>).name.startsWith("com.sup.android.m_message.data.")) {
+                    param.result.getObjectFieldOrNull("data")?.getObjectFieldOrNullAs<List<*>>("count_map")
                         ?.forEach {
-                            it.setObjectField("count", 100)
+                            it.setLongField("count", 100L)
                         }
                 }
             }

@@ -30,7 +30,7 @@ val prefItems: List<List<PrefItem?>> = prefTabs.mapIndexed { index, _ ->
                 SwitchItem(
                     key = "remove_red_dots",
                     title = "去除红点",
-                    summary = "去除关注频道/底栏/插眼红点"
+                    summary = "去除关注频道/底栏/插眼红点；消息99+开启时保留消息角标"
                 ),
                 SwitchItem(
                     key = "remove_stories",
@@ -145,6 +145,13 @@ val prefItems: List<List<PrefItem?>> = prefTabs.mapIndexed { index, _ ->
                     key = "copy_item",
                     title = "复制文字",
                     summary = "分享->复制文字"
+                ),
+                ListItem(
+                    key = "comment_text_color",
+                    title = "评论文字颜色",
+                    summary = "红色在本机显示；对方需使用兼容客户端。含@或时间链接的评论保留原格式。",
+                    entries = mapOf("不处理" to "none", "蓝色" to "blue", "红色" to "red"),
+                    default = "none"
                 ),
                 SwitchItem(
                     key = "unlock_illegal_words",
@@ -457,8 +464,8 @@ val prefItems: List<List<PrefItem?>> = prefTabs.mapIndexed { index, _ ->
                 ),
                 SwitchItem(
                     key = "modify_message_counts",
-                    dependency = "customize",
-                    title = "消息99+"
+                    title = "消息99+",
+                    summary = "仅修改本机显示，优先于去除红点；重启皮皮虾生效"
                 ),
                 SwitchItem(
                     key = "enter_black_house",
@@ -517,7 +524,15 @@ val prefItems: List<List<PrefItem?>> = prefTabs.mapIndexed { index, _ ->
             listOf()
         }
     }
+} .mapIndexed { index, items ->
+    if (index != 1) items else {
+        val video = items.first { it is SwitchItem && it.key == "unlock_video_comment_limit" }
+        items.filter { it !== video }.toMutableList().apply {
+            add(indexOfFirst { it is ListItem && it.key == "comment_text_color" } + 1, video)
+        }
+    }
 }
+
 
 
 enum class Page(val index: Int) {
@@ -560,6 +575,7 @@ class ListItem(
     val title: String,
     val entries: Map<String, String>,
     val default: String = entries.values.first(),
+    val summary: String? = null,
     val dependency: String? = null
 ) : PrefItem
 

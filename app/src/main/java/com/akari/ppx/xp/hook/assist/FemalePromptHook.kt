@@ -14,12 +14,13 @@ import com.akari.ppx.xp.hook.SwitchHook
 
 class FemalePromptHook : SwitchHook("enable_female_prompt") {
     override fun onHook() {
-        var isFemale = false
+        val author = ThreadLocal<Pair<String?, Boolean>>()
         feedCellUtilCompanionClass!!.hookAfterMethod(
             getAuthorInfo(),
             absFeedCellClass
         ) { param ->
-            isFemale = 2 == param.result?.callMethodAs<Int>("getGender")
+            author.set(param.result?.callMethodOrNullAs<String>("getName") to
+                (2 == param.result?.callMethodOrNullAs<Int>("getGender")))
         }
         val targetIds = "com.sup.android.detail.R\$id".findClass(cl).run {
             listOf<Int>(
@@ -34,8 +35,9 @@ class FemalePromptHook : SwitchHook("enable_female_prompt") {
         ) { param ->
             with(param.thisObject as TextView) {
                 targetIds.find { it == id }?.run {
-                    isFemale.check(true) {
-                        val text = param.args[0] as String
+                    val text = param.args[0] as? CharSequence ?: return@hookBeforeMethod
+                    val currentAuthor = author.get()
+                    (currentAuthor?.second == true && currentAuthor.first == text.toString()).check(true) {
                         param.args[0] = SpannableString(text).apply {
                             setSpan(ForegroundColorSpan(-38784), 0, text.length, 33)
                         }

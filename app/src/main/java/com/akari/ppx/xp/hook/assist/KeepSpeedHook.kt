@@ -27,10 +27,9 @@ class KeepSpeedHook : SwitchHook("keep_video_play_speed") {
                 isFirstPress[0] = !isFirstPress[0]
             }
             replaceMethod(vMotionEventHandler(), MotionEvent::class.java) { param ->
-                isLongPressing[0].check(true) {
-                    isFirstPress[0].check(false) { param.invokeOriginalMethod() }
-                    isLongPressing[0] = false
-                }
+                val keepSpeed = isLongPressing[0] && isFirstPress[0]
+                isLongPressing[0] = false
+                if (!keepSpeed) param.invokeOriginalMethod() else null
             }
         }
         "com.sup.superb.video.controllerlayer.i".findClass(cl).apply {
@@ -45,13 +44,12 @@ class KeepSpeedHook : SwitchHook("keep_video_play_speed") {
                 }
             }
             replaceMethod("J") { param ->
+                var keepSpeed = false
                 scope {
-                    isLongPressing[1].check(true) {
-                        isFirstPress[1].check(false) { param.invokeOriginalMethod() }
-                        isLongPressing[1] = false
-                    }
+                    keepSpeed = isLongPressing[1] && isFirstPress[1]
+                    isLongPressing[1] = false
                 }
-                true
+                if (keepSpeed) true else param.invokeOriginalMethod()
             }
         }
     }

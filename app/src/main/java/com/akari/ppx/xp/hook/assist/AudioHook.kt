@@ -318,19 +318,12 @@ class AudioHook : SwitchHook("save_audio") {
         return Uri.fromFile(File(baseDir, displayName))
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun buildAudioMediaInsertCandidates(relativeDir: String): List<Pair<Uri, String>> {
         val preferredAudioPath = Environment.DIRECTORY_MUSIC + "/$relativeDir"
         val preferredDownloadPath = Environment.DIRECTORY_DOWNLOADS + "/$relativeDir"
-        val audioPrimary = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        }
-        val downloadPrimary = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        }
+        val audioPrimary = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val downloadPrimary = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         return listOf(
             audioPrimary to preferredAudioPath,
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI to preferredAudioPath,

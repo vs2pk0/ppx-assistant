@@ -31,9 +31,10 @@ class ShareHook : SwitchHook("simplify_share") {
             Int::class.java
         ) { emptyList<Any>() }
         videoDownloadConfigClass?.let { configClass ->
-            runCatching {
-                configClass.replaceMethod("getN") { false } ?: configClass.replaceMethod("n") { false }
-            }.onFailure(Log::e)
+            configClass.declaredMethods.firstOrNull {
+                it.name in setOf("getN", "n") && it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }?.replaceMethod { false }
         }
         "com.sup.android.uikit.VideoDownloadProgressActivity".findClass(cl).apply {
             declaredMethods.find { m ->

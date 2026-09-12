@@ -46,6 +46,10 @@
             android:exported="true"
             android:theme="@android:style/Theme.NoDisplay" />
 
+        <activity android:name=".ui.CommentSettingsActivity"
+            android:exported="true" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service android:name=".data.alive.AliveService" />
 
         <provider

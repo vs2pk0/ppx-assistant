@@ -9,11 +9,8 @@ import android.net.Uri
 import android.text.TextUtils
 import android.view.View
 import android.widget.Toast
-import com.akari.ppx.data.Const.ALIPAY_URI
 import com.akari.ppx.data.Const.GIT_PAGE_URI
-import com.akari.ppx.data.Const.QQ_GROUP_URI
 import com.akari.ppx.data.Const.TARGET_APP_ID
-import com.akari.ppx.data.Const.TELEGRAM_URI
 import com.akari.ppx.ui.MainActivity
 import com.akari.ppx.xp.Init.asyncCallbackClass
 import com.akari.ppx.xp.Init.cellDigger
@@ -157,20 +154,8 @@ fun setSettingKeyValue(callback: (key: String) -> Any?) {
     }
 }
 
-fun joinTelegram(context: Context, unsatisfiedAction: () -> Unit = {}) = runCatching {
-    Intent().also { Uri.parse(TELEGRAM_URI).let(it::setData) }.let(context::startActivity)
-}.getOrNull() ?: run(unsatisfiedAction)
-
-fun joinQQGroup(context: Context, unsatisfiedAction: () -> Unit = {}) = runCatching {
-    Intent().also { Uri.parse(QQ_GROUP_URI).let(it::setData) }.let(context::startActivity)
-}.getOrNull() ?: run(unsatisfiedAction)
-
 fun openGitPage(context: Context, unsatisfiedAction: () -> Unit = {}) = runCatching {
     context.openBrowser(GIT_PAGE_URI)
-}.getOrNull() ?: run(unsatisfiedAction)
-
-fun startAlipay(context: Context, unsatisfiedAction: () -> Unit = { }) = runCatching {
-    Intent().also { Uri.parse(ALIPAY_URI).let(it::setData) }.let(context::startActivity)
 }.getOrNull() ?: run(unsatisfiedAction)
 
 fun startPPX(context: Context, unsatisfiedAction: () -> Unit = {}) = runCatching {

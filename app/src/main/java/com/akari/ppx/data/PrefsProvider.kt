@@ -8,6 +8,12 @@ import android.os.Bundle
 
 class PrefsProvider : ContentProvider() {
     override fun call(method: String, key: String?, extras: Bundle?): Bundle = Bundle().apply {
+        if (method == PrefsType.SET_STRING.method || method == PrefsType.SET_BOOLEAN.method) {
+            val uid = android.os.Binder.getCallingUid()
+            val allowed = uid == android.os.Process.myUid() ||
+                context?.packageManager?.getPackagesForUid(uid)?.contains(Const.TARGET_APP_ID) == true
+            check(allowed) { "Only the module and target app may update settings" }
+        }
         Prefs.run {
             when (method) {
                 PrefsType.STRING.method -> get<String>(key!!)?.let { putString(PrefsType.STRING.key, it) }

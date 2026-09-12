@@ -8,20 +8,23 @@ import com.akari.ppx.data.Const.PREFS_NAME
 import com.akari.ppx.utils.Log
 
 object ModuleSharedPrefs {
-    private fun prefs(): SharedPreferences? {
+    private val sharedPreferences: SharedPreferences by lazy {
         val context = App.context
-        return try {
+        try {
             @Suppress("DEPRECATION")
             context.getSharedPreferences(PREFS_NAME, Context.MODE_WORLD_READABLE)
         } catch (error: SecurityException) {
-            Log.e("ModuleSharedPrefs unavailable")
-            Log.e(error)
-            null
+            // Modern LSPosed uses remote preferences; world-readable files
+            // are only available when the legacy framework grants access.
+            Log.i("ModuleSharedPrefs using private mirror; modern settings use remote preferences")
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }
     }
 
+    private fun prefs(): SharedPreferences = sharedPreferences
+
     fun mirror(key: String, value: Any?) {
-        prefs()?.edit()?.apply {
+        prefs().edit().apply {
             when (value) {
                 null -> remove(key)
                 is String -> putString(key, value)
@@ -32,11 +35,11 @@ object ModuleSharedPrefs {
                 is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
                 else -> putString(key, value.toString())
             }
-        }?.apply()
+        }.apply()
     }
 
     fun syncAll(preferences: Preferences) {
-        val editor = prefs()?.edit()?.clear() ?: return
+        val editor = prefs().edit().clear()
         preferences.asMap().forEach { (key, value) ->
             when (value) {
                 is String -> editor.putString(key.name, value)

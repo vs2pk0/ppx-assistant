@@ -29,9 +29,8 @@ fun ListPreferenceWidget(
 
     TextPreferenceWidget(
         preference = preference,
-        summary = preference.entries.filter {
-            it.value == value
-        }.toList()[0].first,
+        summary = listOfNotNull(preference.entries.entries.firstOrNull { it.value == value }?.key
+            ?: "使用默认选项", preference.summary).joinToString("\n"),
         onClick = {
             preference.dependency?.let { Prefs.set(it, true) }
             showDialog(!isDialogShown)

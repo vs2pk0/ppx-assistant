@@ -11,17 +11,19 @@ import com.akari.ppx.xp.hook.BaseHook
 class CategoryHook : BaseHook {
     override fun onHook() {
         val defaultChannel =
-            XPrefs<String>("default_channel").let { if (it.isEmpty()) 1 else it.toInt() }
+            XPrefs<String>("default_channel").toIntOrNull() ?: 1
         "com.sup.superb.feedui.bean.CategoryListModel".findClass(cl).apply {
             XPrefs<Boolean>("modify_channels").check(true) {
                 XPrefs<String>("channels").fromJsonList<ChannelItem>().let { items ->
                     hookAfterMethod("getCategoryItems") { param ->
-                        val before = param.result as List<*>
+                        val before = param.result as? List<*> ?: return@hookAfterMethod
                         val after = mutableSetOf<Any>()
                         items.filter { it.checked }.forEach { item ->
-                            before.find {
-                                it?.callMethodAs<String>("getListName") == item.name
-                            }?.let {
+                            (before.find {
+                                it?.callMethodOrNullAs<Int>("getPrimaryListId") == item.type
+                            } ?: before.find {
+                                it?.callMethodOrNullAs<String>("getListName") == item.name
+                            })?.let {
                                 after += it
                             }
                         }

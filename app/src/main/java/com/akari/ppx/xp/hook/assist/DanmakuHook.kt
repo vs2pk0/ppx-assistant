@@ -26,7 +26,9 @@ class DanmakuHook : BaseHook {
                 cl,
                 "getUserPrivilege"
             ) { param ->
-                param.result.setBooleanField("canSendAdvanceDanmaku", true)
+                val privilege = param.result ?: "com.sup.android.mi.usercenter.model.UserInfo\$UserPrivilege".findClass(cl).new()
+                privilege.setBooleanField("canSendAdvanceDanmaku", true)
+                param.result = privilege
             }
         }
         isQuerySender.check(true) {
@@ -59,9 +61,10 @@ class DanmakuHook : BaseHook {
     private fun extractContext(helper: Any?): Context? =
         helper?.getObjectFieldOrNull("b")?.callMethodOrNullAs<Context>("getContext")
 
-    private fun extractUserId(danmaku: Any): Long =
-        listOf("V", "userId", "uid").firstNotNullOfOrNull { danmaku.getLongFieldOrNull(it) }
-            ?.takeIf { it > 0L } ?: 0L
+    internal fun extractUserId(danmaku: Any): Long =
+        listOf("V", "userId", "uid").firstNotNullOfOrNull {
+            danmaku.getLongFieldOrNull(it)?.takeIf { id -> id > 0L }
+        } ?: 0L
 
     private fun openUserProfile(context: Context, userId: Long) {
         mainHandler.post {
@@ -73,10 +76,10 @@ class DanmakuHook : BaseHook {
     }
 
     private fun openDirectProfile(context: Context, userId: Long): Boolean = runCatching {
-        "com.bytedance.router.SmartRouter".findClass(cl)
-            .callStaticMethod("buildRoute", context, "//user/profile")
-            ?.callMethod("withParam", "user_id", userId)
-            ?.callMethod("open")
+        val route = "com.bytedance.router.SmartRouter".findClass(cl)
+            .callStaticMethod("buildRoute", context, "//user/profile") ?: return@runCatching false
+        route.callMethod("withParam", "user_id", userId)
+        route.callMethod("open")
         true
     }.onFailure {
         Log.i("DanmakuHook direct route failed userId=$userId")

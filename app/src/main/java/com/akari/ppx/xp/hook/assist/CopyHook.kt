@@ -38,10 +38,11 @@ class CopyHook : SwitchHook("copy_item") {
         }
 
         fun HookParam.copyText() {
-            val text: String? = runCatching {
-                args[1]?.callMethod("getFeedItem")?.callMethodAs<String>("getContent")
-            }.getOrElse {
-                args[1]?.callMethod("getComment")?.callMethodAs<String>("getText")
+            val cell = args.getOrNull(1)
+            val text = contentText(cell)
+            if (text.isNullOrEmpty()) {
+                showStickyToast("当前内容没有可复制的文字")
+                return
             }
             ((args[0] as Activity).getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(
                 ClipData.newPlainText(text, text)
@@ -72,10 +73,10 @@ class CopyHook : SwitchHook("copy_item") {
         ) { param ->
             param.copyText()
         }
-        "kotlin.jvm.internal.Intrinsics".replaceMethod(
-            cl,
-            "throwUninitializedPropertyAccessException",
-            String::class.java
-        ) {}
     }
+    internal fun contentText(cell: Any?): String? =
+        cell.callMethodOrNull("getReply")?.callMethodOrNullAs<String>("getText")
+            ?: cell.callMethodOrNull("getComment")?.callMethodOrNullAs<String>("getText")
+            ?: cell.callMethodOrNull("getFeedItem")?.callMethodOrNullAs<String>("getContent")
+
 }

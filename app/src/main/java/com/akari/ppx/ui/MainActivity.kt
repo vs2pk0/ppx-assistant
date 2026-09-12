@@ -3,13 +3,9 @@ package com.akari.ppx.ui
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,46 +13,30 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
-import androidx.compose.material.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akari.ppx.ui.screen.PreferenceScreen
 import com.akari.ppx.ui.theme.BaseTheme
-import com.akari.ppx.ui.theme.GREY
-import com.akari.ppx.ui.widget.StatusCardWidget
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import com.akari.ppx.BuildConfig.APPLICATION_ID
 import com.akari.ppx.R
-import com.akari.ppx.data.Const.TARGET_APP_ID
 import com.akari.ppx.data.FrameworkScopeState
 import com.akari.ppx.data.HookStatusImpl
-import com.akari.ppx.data.model.VersionWrapper
 import com.akari.ppx.data.prefTabs
 import com.akari.ppx.ui.screen.AboutScreen
-import com.akari.ppx.utils.VersionChecker
-import com.akari.ppx.utils.VersionChecker.getUpdates
 import com.akari.ppx.utils.VersionChecker.targetVersion
-import com.akari.ppx.utils.openBrowser
-import com.akari.ppx.utils.rememberState
 import com.akari.ppx.utils.startPPX
 
 class MainActivity : ComponentActivity() {
-    private lateinit var scaffoldState: ScaffoldState
-    private lateinit var scope: CoroutineScope
-    private lateinit var fabVisible: MutableState<Boolean>
     private val isActiveState = mutableStateOf(false)
     private val scopeListener = object : FrameworkScopeState.Listener {
         override fun onStateChanged(active: Boolean?) {
@@ -65,140 +45,74 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    private var lastScrollOffset = 0
-    private var currentScrollOffset = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         isActiveState.value = isModuleActive()
         setContent {
             BaseTheme {
-                scaffoldState = rememberScaffoldState()
-                scope = rememberCoroutineScope()
-                fabVisible = rememberState(value = true)
-                var currentIndex by rememberState(value = 0)
+                val darkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+                androidx.compose.runtime.SideEffect {
+                    androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
+                val pager = rememberPagerState(pageCount = { prefTabs.size })
+                val coroutineScope = rememberCoroutineScope()
+                var query by androidx.compose.runtime.remember { mutableStateOf("") }
                 Scaffold(
-                    scaffoldState = scaffoldState,
+                    modifier = Modifier.background(MaterialTheme.colors.background).safeDrawingPadding(),
+                    backgroundColor = MaterialTheme.colors.background,
                     topBar = {
-                        TopAppBar(modifier = Modifier.height(40.dp), elevation = 0.dp) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.logo),
-                                    contentDescription = null,
-                                )
-                                Text(
-                                    text = stringResource(R.string.app_name),
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(painterResource(R.drawable.icon), null,
+                                    Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)))
+                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                    Text("皮皮虾助手", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                                    Text("让每一次刷虾更顺手", style = MaterialTheme.typography.caption,
+                                        color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
+                                }
+                                TextButton(onClick = { startPPX(this@MainActivity) }) { Text("打开皮皮虾") }
                             }
-                        }
-                    },
-                    floatingActionButton = {
-                        AnimatedVisibility(
-                            visible = fabVisible.value,
-                            enter = slideInVertically { it },
-                            exit = slideOutVertically { it }
-                        ) {
-                            FloatingActionButton(
-                                onClick = { startPPX(this@MainActivity) },
-                                modifier = Modifier.padding(
-                                    horizontal = 55.dp,
-                                    vertical = 35.dp
-                                )
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.ppx_logo),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .padding(5.dp)
-                                        .size(40.dp)
-                                )
-                            }
+                            Spacer(Modifier.height(16.dp))
+                            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(),
+                                placeholder = { Text("搜索功能，例如：去水印、评论") }, singleLine = true,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                         }
                     }
-                ) {
-                    val state = rememberPagerState(pageCount = { prefTabs.size })
-                    currentIndex = state.currentPage
-                    Column(Modifier.fillMaxSize()) {
-                        TabRow(
-                            selectedTabIndex = currentIndex,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .size(40.dp),
-                            indicator = { tabPositions ->
-                                Box(
-                                    Modifier
-                                        .tabIndicatorOffset(tabPositions[currentIndex])
-                                        .height(4.dp)
-                                        .padding(horizontal = 20.dp)
-                                        .background(
-                                            color = Color.White,
-                                            shape = MaterialTheme.shapes.medium
-                                        )
-                                )
-                            },
-                            divider = {},
-                            backgroundColor = MaterialTheme.colors.primary
-                        ) {
-                            prefTabs.forEachIndexed { index, _ ->
-                                Tab(
-                                    selected = index == currentIndex,
-                                    onClick = {
-                                        currentIndex = index
-                                        scope.launch {
-                                            state.scrollToPage(index)
-                                        }
-                                    },
-                                    text = {
-                                        Text(prefTabs[index], maxLines = 1)
-                                    },
-                                    selectedContentColor = Color.White,
-                                    unselectedContentColor = GREY
-                                )
+                ) { padding ->
+                    Column(Modifier.fillMaxSize().padding(padding)) {
+                        TabRow(selectedTabIndex = pager.currentPage,
+                            backgroundColor = MaterialTheme.colors.background,
+                            contentColor = MaterialTheme.colors.primary, divider = {}) {
+                            prefTabs.forEachIndexed { index, title ->
+                                Tab(selected = pager.currentPage == index,
+                                    onClick = { coroutineScope.launch { pager.animateScrollToPage(index) } },
+                                    text = { Text(title, fontWeight = FontWeight.SemiBold) })
                             }
                         }
-                        HorizontalPager(
-                            state = state
-                        ) { index ->
-                            val listState = rememberLazyListState()
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                when (index) {
-                                    /* 主页 */ 0 -> {
-                                    val updates =
-                                        rememberState(VersionWrapper()).also {
-                                            scope.launch {
-                                                it.value = getUpdates()
-                                            }
+                        HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { index ->
+                            Column(Modifier.fillMaxSize()) {
+                                if (index == 0 && query.isBlank()) {
+                                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                                        backgroundColor = MaterialTheme.colors.primary.copy(alpha = .08f), elevation = 0.dp) {
+                                        Column(Modifier.padding(18.dp)) {
+                                            Text(if (isActiveState.value) "框架已启用助手" else "等待框架启用",
+                                                fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary)
+                                            Spacer(Modifier.height(5.dp))
+                                            Text("助手 ${com.akari.ppx.BuildConfig.VERSION_NAME}  ·  皮皮虾 $targetVersion",
+                                                style = MaterialTheme.typography.body2)
+                                            Text("修改后重启皮皮虾生效；启动提示可确认本次加载。",
+                                                style = MaterialTheme.typography.caption,
+                                                color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
                                         }
-                                    StatusCardWidget(
-                                        isActive = isActiveState.value,
-                                        updates = updates,
-                                        targetVersion = targetVersion
-                                    ) {
-                                        updates.value.latest?.url?.let { openBrowser(it) }
                                     }
                                 }
-                                    /* 关于 */ 4 -> {
-                                    AboutScreen(isActiveState.value)
-                                }
-                                }
-                                if (!listState.isScrollInProgress) {
-                                    lastScrollOffset = currentScrollOffset
-                                    currentScrollOffset =
-                                        listState.firstVisibleItemScrollOffset + listState.firstVisibleItemIndex * 1000
-                                    fabVisible.value =
-                                        lastScrollOffset - currentScrollOffset >= 0 && currentIndex != 4
-                                }
-                                PreferenceScreen(index, listState)
+                                if (index == 4 && query.isBlank()) AboutScreen(isActiveState.value)
+                                else PreferenceScreen(index, rememberLazyListState(), query)
                             }
                         }
                     }

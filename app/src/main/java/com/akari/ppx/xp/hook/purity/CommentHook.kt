@@ -6,46 +6,19 @@ import com.akari.ppx.data.XPrefs
 import com.akari.ppx.utils.*
 import com.akari.ppx.xp.Init.commentResponseClass
 import com.akari.ppx.xp.hook.SwitchHook
-import java.util.regex.Pattern
 
 class CommentHook : SwitchHook("remove_comments") {
     override fun onHook() {
-        val (keywords, users) = listOf<String>(
-            XPrefs("remove_comments_keywords"),
-            XPrefs("remove_comments_users")
-        ).map { it.splitByOr() }
+        val keywords = FilterPatterns(XPrefs("remove_comments_keywords")) { Log.i("Invalid comment keyword pattern ignored") }
+        val users = FilterPatterns(XPrefs("remove_comments_users")) { Log.i("Invalid comment user pattern ignored") }
         commentResponseClass!!.hookBeforeMethod("a", ArrayList::class.java) { param ->
-            runCatching {
-                val comments = param.args[0] as ArrayList<*>? ?: return@hookBeforeMethod
-                comments.indices.reversed().forEach { i ->
-                    run e@{
-                        val comment = runCatching {
-                            comments[i].callMethod("getReply")
-                        }.getOrElse { comments[i].callMethod("getComment") }!!
-
-                        fun checkPattern(list: ArrayList<String>, input: String?): Boolean {
-                            input?.let {
-                                list.forEach { s ->
-                                    s.checkIf({ Pattern.matches(this, it) }) {
-                                        comments.removeAt(i)
-                                        return true
-                                    }
-                                }
-                            }
-                            return false
-                        }
-                        checkPattern(keywords, comment.getObjectFieldAs("text")).check(true) {
-                            return@e
-                        }
-                        checkPattern(
-                            users,
-                            comment.getObjectField("userInfo")?.getObjectFieldAs("name")!!
-                        ).check(true) {
-                            return@e
-                        }
-                    }
-                }
-            }
+            val comments = param.args[0] as? List<*> ?: return@hookBeforeMethod
+            param.args[0] = ArrayList(comments.filterNot { cell ->
+                val comment = cell.callMethodOrNull("getReply")
+                    ?: cell.callMethodOrNull("getComment")
+                keywords.matches(comment?.getObjectFieldOrNullAs("text")) ||
+                    users.matches(comment?.getObjectFieldOrNull("userInfo")?.getObjectFieldOrNullAs("name"))
+            })
         }
     }
 }
