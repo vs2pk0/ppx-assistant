@@ -79,6 +79,7 @@ jobs:
           apk="app/build/outputs/release-dist/皮友助手-v${RELEASE_VERSION}-release.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
           cd app/build/outputs/release-dist
+          mv "皮友助手-v${RELEASE_VERSION}-release.apk" "piyou-assistant-v${RELEASE_VERSION}-release.apk"
           sha256sum *.apk > SHA256SUMS.txt
       - name: 上传构建报告
         if: always()
