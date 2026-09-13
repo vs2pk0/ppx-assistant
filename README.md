@@ -1,6 +1,8 @@
-# 皮皮虾助手
+# 皮友助手
 
 一个基于 LSPosed 的皮皮虾增强模块。
+
+应用包名：`com.vs2pk0.piyou`。从 `0.0.2` 起更名为皮友助手；旧包 `com.akari.ppx` 的设置不会自动迁移。安装后请在 LSPosed 中停用旧模块、启用皮友助手并勾选皮皮虾作用域，再重启皮皮虾。
 
 当前维护：[我的馬眼会发光 / vs2pk0](https://github.com/vs2pk0) · [项目仓库](https://github.com/vs2pk0/ppx-assistant) · [问题反馈](https://github.com/vs2pk0/ppx-assistant/issues)
 
@@ -88,7 +90,7 @@ Release APK 输出：
 
 ## 下载
 
-已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 分发。当前版本从 `0.0.1` 开始使用 `0.0.x` 命名，内部版本号保持递增。
+已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 分发。当前版本为 `0.0.2`，使用 `0.0.x` 命名，内部版本号保持递增。`0.0.1` 构建在应用更名时取消，未发布安装包。
 
 发布时先更新 `app/build.gradle.kts` 中的版本名和版本号，再添加 `docs/releases/<版本>.md` 更新说明。推送对应的 `v<版本>` 标签后，Actions 自动运行测试、lint 和签名构建，并发布带中文更新说明的 Release、APK 和 SHA-256 校验文件；Actions 摘要也会显示更新内容。手动运行工作流时填写已存在的版本标签。
 

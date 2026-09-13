@@ -2,6 +2,6 @@
 <resources>
     <string-array name="xposed_scope">
         <item>com.sup.android.superb</item>
-        <item>com.akari.ppx</item>
+        <item>com.vs2pk0.piyou</item>
     </string-array>
 </resources>

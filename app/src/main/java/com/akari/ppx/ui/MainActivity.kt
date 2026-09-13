@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
                                 Image(painterResource(R.drawable.icon), null,
                                     Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)))
                                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                                    Text("皮皮虾助手", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                                    Text("皮友助手", fontSize = 23.sp, fontWeight = FontWeight.Bold)
                                     Text("让每一次刷虾更顺手", style = MaterialTheme.typography.caption,
                                         color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
                                 }

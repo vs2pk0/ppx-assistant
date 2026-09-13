@@ -12,8 +12,8 @@ project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream
     properties.load(it)
 }
 
-val verCode = 20260918
-val verName = "0.0.1"
+val verCode = 20260919
+val verName = "0.0.2"
 
 android {
     compileSdk = 36
@@ -21,7 +21,7 @@ android {
     namespace = "com.akari.ppx"
 
     defaultConfig {
-        applicationId = "com.akari.ppx"
+        applicationId = "com.vs2pk0.piyou"
         minSdk = 26
 
         targetSdk = 36
@@ -133,7 +133,7 @@ val renameReleaseApk by tasks.registering(Copy::class) {
     dependsOn("assembleRelease")
     from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
     into(layout.buildDirectory.dir("outputs/release-dist"))
-    rename { "皮皮虾助手-v${verName}-release.apk" }
+    rename { "皮友助手-v${verName}-release.apk" }
 }
 
 tasks.matching { it.name == "assembleRelease" }.configureEach {

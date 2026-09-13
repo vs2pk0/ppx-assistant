@@ -64,7 +64,7 @@ class QuickActionsHook : BaseHook {
     private fun showSettings(composer: Dialog) {
         (composer.context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
             .hideSoftInputFromWindow(composer.window?.decorView?.windowToken, 0)
-        val intent = android.content.Intent().setClassName("com.akari.ppx", "com.akari.ppx.ui.CommentSettingsActivity")
+        val intent = android.content.Intent().setClassName(com.akari.ppx.BuildConfig.APPLICATION_ID, "com.akari.ppx.ui.CommentSettingsActivity")
         runCatching { composer.context.startActivity(intent) }
             .onFailure { Log.e(it); composer.context.showToast("无法打开助手评论设置") }
     }

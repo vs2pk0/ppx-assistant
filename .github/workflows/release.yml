@@ -76,7 +76,7 @@ jobs:
         run: bash ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon --console=plain
       - name: 验证 APK 签名并生成校验值
         run: |
-          apk="app/build/outputs/release-dist/皮皮虾助手-v${RELEASE_VERSION}-release.apk"
+          apk="app/build/outputs/release-dist/皮友助手-v${RELEASE_VERSION}-release.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
           cd app/build/outputs/release-dist
           sha256sum *.apk > SHA256SUMS.txt
@@ -96,7 +96,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --title "皮皮虾助手 ${RELEASE_VERSION}" --notes-file "$RELEASE_NOTES" app/build/outputs/release-dist/*
+          gh release create "$RELEASE_TAG" --verify-tag --title "皮友助手 ${RELEASE_VERSION}" --notes-file "$RELEASE_NOTES" app/build/outputs/release-dist/*
           printf '\n发布成功：[下载 %s](https://github.com/%s/releases/tag/%s)\n' "$RELEASE_TAG" "$GITHUB_REPOSITORY" "$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
       - name: 清理临时签名
         if: always()

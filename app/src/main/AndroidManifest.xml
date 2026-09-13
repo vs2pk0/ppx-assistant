@@ -54,7 +54,7 @@
 
         <provider
             android:name=".data.PrefsProvider"
-            android:authorities="com.akari.ppx.CP"
+            android:authorities="${applicationId}.CP"
             android:enabled="true"
             android:exported="true"
             android:grantUriPermissions="true"

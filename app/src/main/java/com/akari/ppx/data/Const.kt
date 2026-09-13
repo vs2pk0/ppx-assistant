@@ -3,11 +3,11 @@ package com.akari.ppx.data
 import com.akari.ppx.data.model.ChannelItem
 
 object Const {
-    const val APP_NAME = "皮皮虾助手"
+    const val APP_NAME = "皮友助手"
     const val TARGET_APP_ID = "com.sup.android.superb"
     const val PREFS_NAME = "settings"
     const val CACHE_NAME = ".cache620v2"
-    const val CP_URI = "content://com.akari.ppx.CP/"
+    const val CP_URI = "content://${com.akari.ppx.BuildConfig.APPLICATION_ID}.CP/"
     const val TAB_SCHEMA = "akari://open_zs"
     const val GIT_PAGE_URI = "https://github.com/vs2pk0/ppx-assistant"
     const val CHANNEL_KEY = "channels"

@@ -10,7 +10,7 @@ import time
 import uuid
 
 adb = str(Path(os.environ.get("ANDROID_HOME", Path.home() / "Library/Android/sdk")) / "platform-tools/adb")
-runner = "com.akari.ppx.test/com.akari.ppx.test.PreferenceInstrumentation"
+runner = "com.vs2pk0.piyou.test/com.akari.ppx.test.PreferenceInstrumentation"
 mode = sys.argv[1]
 value = (json.loads(Path(sys.argv[2]).read_text()) if mode == "restore" else json.loads(sys.argv[2])) if len(sys.argv) > 2 else {}
 

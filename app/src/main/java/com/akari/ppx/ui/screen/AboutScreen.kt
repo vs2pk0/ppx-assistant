@@ -32,7 +32,7 @@ fun AboutScreen(isActive: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Image(painterResource(R.drawable.icon), null, Modifier.size(80.dp))
-        Text("皮皮虾助手", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("皮友助手", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text("我的馬眼会发光 · @vs2pk0", style = MaterialTheme.typography.subtitle1)
         Text("版本 $VERSION_NAME · " + if (isActive) "框架已启用" else "框架未启用",
             style = MaterialTheme.typography.caption)

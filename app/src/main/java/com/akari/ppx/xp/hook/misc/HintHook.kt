@@ -17,8 +17,8 @@ class HintHook : BaseHook {
             if (shown || param.args[0] != true || ModuleEntryBridge.installedCount == 0) return@hookAfterMethod
             shown = true
             val failed = ModuleEntryBridge.failedCount
-            val message = if (failed == 0) "皮皮虾助手 $VERSION_NAME 加载成功"
-                else "皮皮虾助手已加载，$failed 项功能初始化失败"
+            val message = if (failed == 0) "皮友助手 $VERSION_NAME 加载成功"
+                else "皮友助手已加载，$failed 项功能初始化失败"
             (param.thisObject as Activity).runOnUiThread {
                 Toast.makeText(param.thisObject as Activity, message, Toast.LENGTH_SHORT).show()
             }

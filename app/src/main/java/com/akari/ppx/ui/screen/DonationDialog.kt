@@ -58,9 +58,9 @@ fun DonationDialog(wechat: Boolean, onDismiss: () -> Unit) {
                     val result = withContext(Dispatchers.IO) { runCatching {
                         check(Build.VERSION.SDK_INT >= 29) { "当前系统请使用另一台设备扫码" }
                         val values = ContentValues().apply {
-                            put(MediaStore.Images.Media.DISPLAY_NAME, "皮皮虾助手-${label}赞赏-${System.currentTimeMillis()}." + if (wechat) "png" else "jpg")
+                            put(MediaStore.Images.Media.DISPLAY_NAME, "皮友助手-${label}赞赏-${System.currentTimeMillis()}." + if (wechat) "png" else "jpg")
                             put(MediaStore.Images.Media.MIME_TYPE, if (wechat) "image/png" else "image/jpeg")
-                            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/皮皮虾助手")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/皮友助手")
                             put(MediaStore.Images.Media.IS_PENDING, 1)
                         }
                         val resolver = context.contentResolver
