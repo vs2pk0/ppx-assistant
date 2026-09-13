@@ -11,9 +11,11 @@ import com.akari.ppx.xp.Init.cl
 import com.akari.ppx.xp.Init.feedCellUtilCompanionClass
 import com.akari.ppx.xp.Init.getAuthorInfo
 import com.akari.ppx.xp.hook.SwitchHook
+import com.akari.ppx.data.XPrefs
 
 class FemalePromptHook : SwitchHook("enable_female_prompt") {
     override fun onHook() {
+        val color = FemalePromptColors.argb(XPrefs("female_prompt_color", FemalePromptColors.DEFAULT))
         val author = ThreadLocal<Pair<String?, Boolean>>()
         feedCellUtilCompanionClass!!.hookAfterMethod(
             getAuthorInfo(),
@@ -39,7 +41,7 @@ class FemalePromptHook : SwitchHook("enable_female_prompt") {
                     val currentAuthor = author.get()
                     (currentAuthor?.second == true && currentAuthor.first == text.toString()).check(true) {
                         param.args[0] = SpannableString(text).apply {
-                            setSpan(ForegroundColorSpan(-38784), 0, text.length, 33)
+                            setSpan(ForegroundColorSpan(color), 0, text.length, 33)
                         }
                     }
                 }

@@ -11,6 +11,31 @@ class DeviceProbeHook : BaseHook {
     private var ran = false
 
     override fun onHook() {
+        var appearanceRan = false
+        Init.mainActivityClass?.hookAfterMethod("onResume") { param ->
+            if (!appearanceRan && XPrefs<Boolean>("__probe_appearance")) {
+                appearanceRan = true
+                val activity = param.thisObject as android.app.Activity
+                probe("splash_forced_ad_uses_no_ad_path") {
+                    val helperClass = Init.mainActivityClass!!.getDeclaredField("mSplashHelper").type
+                    val method = helperClass.declaredMethods.single {
+                        it.parameterTypes.size == 3 && it.parameterTypes[2] == Boolean::class.javaPrimitiveType
+                    }
+                    val helper = helperClass.new()
+                    val isolatedActivity = method.parameterTypes[0].new()
+                    method.invoke(helper, isolatedActivity, 0, true)
+                    !helper.getBooleanField("f")
+                }
+                probe("splash_main_not_showing") {
+                    !activity.getObjectField("mSplashHelper").getBooleanField("e")
+                }
+                probe("splash_image_stays_hidden") {
+                    activity.callMethod("updateFakedSplashViewVisible", true)
+                    activity.getObjectFieldOrNullAs<android.view.View>("mFakedSplashView")?.visibility != android.view.View.VISIBLE
+                }
+                probe("female_custom_color_and_recycled_name") { checkFemaleColor() }
+            }
+        }
         Init.mainActivityClass?.hookAfterMethod("onResume") {
             if (!ran && XPrefs<Boolean>("__probe_models")) {
                 ran = true
@@ -164,7 +189,7 @@ class DeviceProbeHook : BaseHook {
         probe("reply_video_button") {
             val id = "com.sup.android.module.publish.R\$id".findClass(Init.cl)
                 .getStaticObjectFieldAs<Int>("iv_comment_video")
-            val view = android.widget.ImageView(Init.ctx).apply { this.id = id; visibility = 8 }
+            val view = android.widget.ImageView(Init.ctx).apply { this.id = id; visibility = android.view.View.GONE }
             view.visibility == 0
         }
         probe("feed_filter_keyword_and_user") {
@@ -201,18 +226,7 @@ class DeviceProbeHook : BaseHook {
             copy.contentText(cell) == "测试😊" && copy.contentText(replyCell) == "回复😊" && copy.contentText(null) == null
         }
         probe("female_label_spannable_and_other_user") {
-            val author = model("com.sup.android.mi.usercenter.model.UserInfo")
-                .setObjectField("name", "PPX-TEST-FEMALE").setIntField("gender", 2)
-            val item = model("com.sup.android.mi.feed.repo.bean.cell.VideoFeedItem").setObjectField("author", author)
-            val cell = model("com.sup.android.mi.feed.repo.bean.cell.ItemFeedCell").setObjectField("feedItem", item)
-            singleton(Init.feedCellUtilCompanionClass!!).callMethod(Init.getAuthorInfo(), cell)
-            val view = android.widget.TextView(Init.ctx).apply {
-                id = "com.sup.android.detail.R\$id".findClass(Init.cl).getStaticObjectFieldAs("detail_item_user_name_tv")
-                text = android.text.SpannableString("PPX-TEST-FEMALE")
-            }
-            val highlighted = (view.text as? android.text.Spanned)?.getSpans(0, view.text.length, android.text.style.ForegroundColorSpan::class.java)?.isNotEmpty() == true
-            view.text = "另一个用户"
-            highlighted && (view.text !is android.text.Spanned || (view.text as android.text.Spanned).getSpans(0, view.text.length, android.text.style.ForegroundColorSpan::class.java).isEmpty())
+            checkFemaleColor()
         }
         probe("feed_filter_promotion") {
             val item = model("com.sup.android.mi.feed.repo.bean.cell.VideoFeedItem")
@@ -292,6 +306,22 @@ class DeviceProbeHook : BaseHook {
             probe("layout_${it.key}") { setting(it.key, !it.checked) == it.checked }
         }
         Log.i("DEVICE_TEST COMPLETE")
+    }
+
+    private fun checkFemaleColor(): Boolean {
+        val author = model("com.sup.android.mi.usercenter.model.UserInfo")
+            .setObjectField("name", "PPX-TEST-FEMALE").setIntField("gender", 2)
+        val item = model("com.sup.android.mi.feed.repo.bean.cell.VideoFeedItem").setObjectField("author", author)
+        val cell = model("com.sup.android.mi.feed.repo.bean.cell.ItemFeedCell").setObjectField("feedItem", item)
+        singleton(Init.feedCellUtilCompanionClass!!).callMethod(Init.getAuthorInfo(), cell)
+        val view = android.widget.TextView(Init.ctx).apply {
+            id = "com.sup.android.detail.R\$id".findClass(Init.cl).getStaticObjectFieldAs("detail_item_user_name_tv")
+            text = android.text.SpannableString("PPX-TEST-FEMALE")
+        }
+        val expectedColor = FemalePromptColors.argb(XPrefs("female_prompt_color", FemalePromptColors.DEFAULT))
+        val highlighted = (view.text as? android.text.Spanned)?.getSpans(0, view.text.length, android.text.style.ForegroundColorSpan::class.java)?.any { it.foregroundColor == expectedColor } == true
+        view.text = "另一个用户"
+        return highlighted && (view.text !is android.text.Spanned || (view.text as android.text.Spanned).getSpans(0, view.text.length, android.text.style.ForegroundColorSpan::class.java).isEmpty())
     }
 
     private class SenderFixture {

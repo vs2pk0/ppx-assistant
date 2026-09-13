@@ -43,6 +43,7 @@ class SettingsCategoryTest {
                 val dependency = when (item) {
                     is EditItem -> item.dependency
                     is ListItem -> item.dependency
+                    is ColorItem -> item.dependency
                     else -> null
                 }
                 if (dependency != null) assertTrue("${item.settingKey()} missing $dependency", category.items.any { it.settingKey() == dependency })

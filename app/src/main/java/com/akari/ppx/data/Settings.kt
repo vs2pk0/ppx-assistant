@@ -5,6 +5,7 @@ import com.akari.ppx.data.Const.CATEGORY_NAMES
 import com.akari.ppx.data.Const.CATEGORY_TYPES
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.utils.hideIcon
+import com.akari.ppx.utils.FemalePromptColors
 
 val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
     when (Page.fromIndex(index)) {
@@ -24,6 +25,11 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     key = "remove_ads",
                     title = "去除广告",
                     summary = "去除启动页/帖子/评论/小程序等广告"
+                ),
+                SwitchItem(
+                    key = "skip_splash",
+                    title = "跳过启动展示页",
+                    summary = "隐藏启动展示图；开关后先进入一次皮皮虾，下次冷启动生效，初始化时仍可能短暂白屏"
                 ),
                 SwitchItem(
                     key = "remove_red_dots",
@@ -204,7 +210,13 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "enable_female_prompt",
                     title = "开启母虾提示",
-                    summary = "评论区的母虾名字显示为粉色"
+                    summary = "评论区的母虾名字使用指定颜色；重启皮皮虾生效"
+                ),
+                ColorItem(
+                    key = "female_prompt_color",
+                    title = "母虾提示颜色",
+                    default = FemalePromptColors.DEFAULT,
+                    dependency = "enable_female_prompt"
                 ),
                 CheckBoxListItem(
                     key = "enable_double_layout_style",
@@ -577,6 +589,13 @@ class ListItem(
     val dependency: String? = null
 ) : PrefItem
 
+class ColorItem(
+    val key: String,
+    val title: String,
+    val default: String,
+    val dependency: String? = null
+) : PrefItem
+
 class CheckBoxListItem(
     val key: String,
     val title: String,
@@ -602,6 +621,7 @@ fun PrefItem.settingKey(): String = when (this) {
     is SwitchItem -> key
     is EditItem -> key
     is ListItem -> key
+    is ColorItem -> key
     is CheckBoxListItem -> key
     is ChannelListItem -> key
     else -> ""

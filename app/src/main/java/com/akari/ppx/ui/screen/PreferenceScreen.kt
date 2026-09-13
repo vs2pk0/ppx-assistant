@@ -138,6 +138,7 @@ fun PreferenceScreen(
             is TextItem -> "${item.title} ${item.summary}".contains(query, true)
             is EditItem -> item.title.contains(query, true)
             is ListItem -> item.title.contains(query, true)
+            is ColorItem -> item.title.contains(query, true)
             is CheckBoxListItem -> item.title.contains(query, true)
             is ChannelListItem -> item.title.contains(query, true)
             else -> false
@@ -159,6 +160,16 @@ fun PreferenceScreen(
         visible.map { item ->
 
             when (item) {
+                is ColorItem -> item {
+                    val prefs by Prefs.dsData.collectAsState(initial = null)
+                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colors.surface) {
+                        ColorPreferenceWidget(
+                            preference = item,
+                            value = prefs?.get(stringPreferencesKey(item.key)) ?: item.default,
+                            onValueChange = { Prefs.set(item.key, it) }
+                        )
+                    }
+                }
                 is TextItem -> item {
                     PreferenceItem(
                         Preference.PreferenceItem.TextPreference(

@@ -12,8 +12,8 @@ project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream
     properties.load(it)
 }
 
-val verCode = 20260920
-val verName = "0.0.3"
+val verCode = 20260921
+val verName = "0.0.4"
 
 android {
     compileSdk = 36
