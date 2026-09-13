@@ -29,6 +29,7 @@ import com.akari.ppx.data.FrameworkScopeState
 import com.akari.ppx.data.HookStatusImpl
 import com.akari.ppx.ui.screen.AboutScreen
 import com.akari.ppx.utils.VersionChecker.targetVersion
+import com.akari.ppx.utils.VersionChecker.supportedVersionLabel
 import com.akari.ppx.utils.startPPX
 
 class MainActivity : ComponentActivity() {
@@ -97,7 +98,7 @@ class MainActivity : ComponentActivity() {
                                         Column(Modifier.fillMaxWidth().padding(18.dp)) {
                                             Text(if (isActiveState.value) "框架已启用助手" else "等待框架启用", fontWeight = FontWeight.Bold)
                                             Text("助手 ${com.akari.ppx.BuildConfig.VERSION_NAME} · 皮皮虾 $targetVersion")
-                                            Text("目前仅适配皮皮虾 6.2.0；修改后重启生效。", style = MaterialTheme.typography.caption)
+                                            Text("已适配皮皮虾 $supportedVersionLabel；修改后重启生效。", style = MaterialTheme.typography.caption)
                                         }
                                     }
                                 }

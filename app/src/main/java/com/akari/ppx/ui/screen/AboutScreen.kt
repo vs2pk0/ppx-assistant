@@ -21,6 +21,7 @@ import com.akari.ppx.R
 import com.akari.ppx.data.Const.GIT_PAGE_URI
 import com.akari.ppx.ui.widget.AboutCardWidget
 import com.akari.ppx.utils.openBrowser
+import com.akari.ppx.utils.VersionChecker
 
 @Composable
 fun AboutScreen(isActive: Boolean) {
@@ -38,8 +39,10 @@ fun AboutScreen(isActive: Boolean) {
         Card(elevation = 0.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("版本适配列表", fontWeight = FontWeight.Bold)
-                Text("皮皮虾 6.2.0 · 已适配")
-                Text("目前仅支持 6.2.0，其他版本尚未适配。", style = MaterialTheme.typography.caption)
+                VersionChecker.supportedVersions.forEach { version ->
+                    Text("皮皮虾 $version · 已适配")
+                }
+                Text("当前安装：${VersionChecker.targetVersion}；其他版本尚未验证。", style = MaterialTheme.typography.caption)
             }
         }
         AboutCardWidget(Modifier.height(64.dp), onClick = {
