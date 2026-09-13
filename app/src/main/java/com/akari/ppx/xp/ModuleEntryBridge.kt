@@ -5,6 +5,7 @@ import android.os.Bundle
 import com.akari.ppx.BuildConfig.APPLICATION_ID
 import com.akari.ppx.data.Const.TARGET_APP_ID
 import com.akari.ppx.data.XPrefs
+import com.akari.ppx.data.AutomationAvailability
 import com.akari.ppx.utils.HookRuntime
 import com.akari.ppx.utils.Log
 import com.akari.ppx.utils.check
@@ -118,6 +119,10 @@ object ModuleEntryBridge {
         }
         Log.i("Entry install hooks from $source size=${hooks.size}")
         hooks.forEach { hook ->
+            if (!AutomationAvailability.isHookAvailable(hook.javaClass.name)) {
+                Log.i("Entry skip unavailable automation ${hook.javaClass.name}")
+                return@forEach
+            }
             runCatching {
                 Log.d("Entry run hook ${hook.javaClass.name}")
                 when (hook) {

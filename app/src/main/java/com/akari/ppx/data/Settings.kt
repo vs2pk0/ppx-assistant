@@ -184,7 +184,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "unlock_send_god_limit",
                     title = "解除神评已送满限制",
-                    summary = "已送满的评论会自动点赞"
+                    summary = "显示已送满评论的送神入口，结果以服务器为准"
                 ),
                 SwitchItem(
                     key = "unlock_video_comment_limit",
@@ -244,7 +244,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "modify_interaction_style",
                     title = "修改默认交互样式",
-                    summary = "影响自动点赞/踩"
+                    summary = "修改点赞与点踩的显示样式"
                 ),
                 ListItem(
                     key = "digg_style",
@@ -608,7 +608,9 @@ fun PrefItem.settingKey(): String = when (this) {
 }
 
 val settingsCategories: List<SettingsCategory> by lazy {
-    val all = prefItems.flatten().filterNotNull().filter { it !== ItemDivider }
+    val all = prefItems.flatten().filterNotNull().filter {
+        it !== ItemDivider && AutomationAvailability.isSettingAvailable(it.settingKey())
+    }
     val downloads = setOf("save_image", "save_video", "save_audio", "copy_item", "remove_download_restrictions")
     val comments = setOf("comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_1080p_limit", "unlock_highlight", "unlock_emoji_limit", "unlock_send_god_limit", "enable_show_location_label")
     val interfaceKeys = prefItems[3].filterNotNull().map { it.settingKey() }.toSet() + setOf("modify_channels", "default_channel", "enable_double_layout_style", "enable_old_god_icon_style", "use_feed_footer_new_style", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
@@ -623,4 +625,5 @@ val settingsCategories: List<SettingsCategory> by lazy {
         Triple("界面与个人资料", "频道布局、消息角标、本机资料与图标", interfaceKeys)
     )
     groups.map { (title, description, keys) -> SettingsCategory(title, description, all.filter { it.settingKey() in keys }) }
+        .filter { it.items.isNotEmpty() }
 }

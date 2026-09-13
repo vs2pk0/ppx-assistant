@@ -34,8 +34,9 @@ object XPrefs {
         when (T::class.java) {
             String::class.java -> remotePrefs()?.getString(key, (defValue ?: "") as String)
                 ?: prefs().getString(key, (defValue ?: "") as String) ?: ""
-            java.lang.Boolean::class.java -> remotePrefs()?.getBoolean(key, (defValue ?: false) as Boolean)
-                ?: prefs().getBoolean(key, (defValue ?: false) as Boolean)
+            java.lang.Boolean::class.java -> if (!AutomationAvailability.isSettingAvailable(key)) false
+                else remotePrefs()?.getBoolean(key, (defValue ?: false) as Boolean)
+                    ?: prefs().getBoolean(key, (defValue ?: false) as Boolean)
             else -> null
         } as T
 
