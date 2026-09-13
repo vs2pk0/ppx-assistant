@@ -12,8 +12,8 @@ project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream
     properties.load(it)
 }
 
-val verCode = 20260919
-val verName = "0.0.2"
+val verCode = 20260920
+val verName = "0.0.3"
 
 android {
     compileSdk = 36
@@ -21,7 +21,7 @@ android {
     namespace = "com.akari.ppx"
 
     defaultConfig {
-        applicationId = "com.vs2pk0.piyou"
+        applicationId = "io.github.vs2pk0.piyou"
         minSdk = 26
 
         targetSdk = 36
