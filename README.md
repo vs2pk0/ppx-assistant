@@ -88,7 +88,11 @@ Release APK 输出：
 
 ## 下载
 
-已构建版本通过 [GitHub Releases 下载页](https://github.com/2186056836/ppx/releases) 分发。
+已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 分发。当前版本从 `0.0.1` 开始使用 `0.0.x` 命名，内部版本号保持递增。
+
+发布时先更新 `app/build.gradle.kts` 中的版本名和版本号，再添加 `docs/releases/<版本>.md` 更新说明。推送对应的 `v<版本>` 标签后，Actions 自动运行测试、lint 和签名构建，并发布带中文更新说明的 Release、APK 和 SHA-256 校验文件；Actions 摘要也会显示更新内容。手动运行工作流时填写已存在的版本标签。
+
+CI 签名使用仓库 Secrets：`PPX_KEYSTORE_BASE64`、`PPX_STORE_PASSWORD`、`PPX_KEY_ALIAS`、`PPX_KEY_PASSWORD`，缺少密钥时停止发布。当前沿用既有安装包签名以支持覆盖升级，签名材料不入库。
 
 ## 许可
 

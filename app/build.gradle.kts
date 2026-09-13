@@ -8,10 +8,12 @@ plugins {
 }
 
 val properties = Properties()
-properties.load(project.rootProject.file("local.properties").inputStream())
+project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use {
+    properties.load(it)
+}
 
-val verCode = 20260917
-val verName = "26.09.13-r6"
+val verCode = 20260918
+val verName = "0.0.1"
 
 android {
     compileSdk = 36
@@ -33,12 +35,12 @@ android {
         }
     }
 
-    val config = properties.getProperty("storeFile")?.let {
+    val config = (System.getenv("PPX_KEYSTORE_FILE") ?: properties.getProperty("storeFile"))?.let {
         signingConfigs.create("config") {
             storeFile = file(it)
-            storePassword = properties.getProperty("storePassword")
-            keyAlias = properties.getProperty("keyAlias")
-            keyPassword = properties.getProperty("keyPassword")
+            storePassword = System.getenv("PPX_STORE_PASSWORD") ?: properties.getProperty("storePassword")
+            keyAlias = System.getenv("PPX_KEY_ALIAS") ?: properties.getProperty("keyAlias")
+            keyPassword = System.getenv("PPX_KEY_PASSWORD") ?: properties.getProperty("keyPassword")
         }
     }
 
