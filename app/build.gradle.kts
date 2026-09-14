@@ -12,8 +12,8 @@ project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream
     properties.load(it)
 }
 
-val verCode = 20260922
-val verName = "0.0.5"
+val verCode = 20260923
+val verName = "0.0.6"
 
 android {
     compileSdk = 36
@@ -90,6 +90,7 @@ android {
 }
 
 dependencies {
+    implementation("com.squareup:gifencoder:0.10.1")
     implementation("io.noties.markwon:core:4.6.2")
     compileOnly(Libs.xposed_api)
     implementation(project(":xposed-modern-api101-entry"))

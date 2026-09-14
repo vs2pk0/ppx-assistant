@@ -25,6 +25,15 @@ class PreferenceInstrumentation : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            arguments.getString("webpTest")?.let { path ->
+                val output = java.io.File(targetContext.getExternalFilesDir(null), "converted-test.gif")
+                com.akari.ppx.utils.WebpGifConverter.convert(java.io.File(path), output)
+                val drawable = android.graphics.ImageDecoder.decodeDrawable(android.graphics.ImageDecoder.createSource(output))
+                check(drawable is android.graphics.drawable.AnimatedImageDrawable)
+                result.putString("webpTest", "PASS animated GIF: ${output.absolutePath}")
+                finish(Activity.RESULT_OK, result)
+                return
+            }
             if (arguments.getString("iconTest") == "true") {
                 val alias = android.content.ComponentName(targetContext, "com.akari.ppx.ui.MainActivityAlias")
                 val manager = targetContext.packageManager
