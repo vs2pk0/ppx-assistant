@@ -22,6 +22,7 @@ class DeviceUiProbeHook : BaseHook {
     private val handler = Handler(Looper.getMainLooper())
     private var started = false
     private var lastCommand = ""
+    private var resumedActivity = java.lang.ref.WeakReference<Activity>(null)
 
     override fun onHook() {
         "com.sup.android.mi.feed.repo.bean.comment.Comment".findClass(Init.cl).hookAfterMethod("getText") { param ->
@@ -40,6 +41,7 @@ class DeviceUiProbeHook : BaseHook {
         }
 
         Activity::class.java.hookAfterMethod("onResume") {
+            resumedActivity = java.lang.ref.WeakReference(it.thisObject as Activity)
             if (!started && XPrefs<Boolean>("__probe_ui")) {
                 started = true
                 handler.post(object : Runnable {
@@ -74,6 +76,13 @@ class DeviceUiProbeHook : BaseHook {
             if (json.optString("action") == "clipboard") {
                 val clipboard = Init.ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 output.put("clipboard", clipboard.primaryClip?.getItemAt(0)?.text ?: "")
+            }
+            if (json.optString("action") == "forwardImages") {
+                val urls = json.getJSONArray("urls")
+                val content = ForwardContent("", json.getString("text"), (0 until urls.length()).map {
+                    ForwardContent.Media(listOf(urls.getString(it)), false)
+                })
+                ForwardPublisher.start(resumedActivity.get() ?: error("No resumed activity"), content)
             }
             if (json.optString("action") == "sender") {
                 val ownUser = "com.sup.android.module.usercenter.UserCenterService".findClass(Init.cl)
@@ -116,7 +125,7 @@ class DeviceUiProbeHook : BaseHook {
                     output.put("media", JSONArray((0 until extractor.trackCount).map { extractor.getTrackFormat(it).toString() }))
                 } finally { extractor.release() }
             }
-            json.optString("action").takeIf { it.isNotBlank() && it !in setOf("dump", "clipboard", "media", "self", "sound", "sender", "commentColor") }?.let { action ->
+            json.optString("action").takeIf { it.isNotBlank() && it !in setOf("dump", "clipboard", "media", "self", "sound", "sender", "commentColor", "forwardImages") }?.let { action ->
                 val selected = views.filter { view ->
                     (!json.has("id") || resourceName(view) == json.getString("id")) &&
                         (!json.has("text") || (view as? TextView)?.text?.toString() == json.getString("text")) &&

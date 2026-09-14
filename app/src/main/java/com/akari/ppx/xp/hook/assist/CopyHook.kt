@@ -74,9 +74,6 @@ class CopyHook : SwitchHook("copy_item") {
             param.copyText()
         }
     }
-    internal fun contentText(cell: Any?): String? =
-        cell.callMethodOrNull("getReply")?.callMethodOrNullAs<String>("getText")
-            ?: cell.callMethodOrNull("getComment")?.callMethodOrNullAs<String>("getText")
-            ?: cell.callMethodOrNull("getFeedItem")?.callMethodOrNullAs<String>("getContent")
+    internal fun contentText(cell: Any?): String? = ForwardContent.text(cell)
 
 }

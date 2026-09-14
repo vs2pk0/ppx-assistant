@@ -24,7 +24,7 @@ import com.akari.ppx.utils.openBrowser
 import com.akari.ppx.utils.VersionChecker
 
 @Composable
-fun AboutScreen(isActive: Boolean) {
+fun AboutScreen(isActive: Boolean, checkingUpdate: Boolean, onCheckUpdate: () -> Unit) {
     val context = LocalContext.current
     var donation by remember { mutableStateOf<Boolean?>(null) }
     donation?.let { DonationDialog(it) { donation = null } }
@@ -36,6 +36,9 @@ fun AboutScreen(isActive: Boolean) {
         Text("我的馬眼会发光 · @vs2pk0", style = MaterialTheme.typography.subtitle1)
         Text("版本 $VERSION_NAME · " + if (isActive) "框架已启用" else "框架未启用",
             style = MaterialTheme.typography.caption)
+        TextButton(onClick = onCheckUpdate, enabled = !checkingUpdate) {
+            Text(if (checkingUpdate) "正在检查更新…" else "检查更新")
+        }
         Card(elevation = 0.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("版本适配列表", fontWeight = FontWeight.Bold)

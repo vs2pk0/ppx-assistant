@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
         isActiveState.value = isModuleActive()
         setContent {
             BaseTheme {
+                val (checkingUpdate, checkUpdate) = rememberAssistantUpdateCheck()
                 val darkTheme = androidx.compose.foundation.isSystemInDarkTheme()
                 androidx.compose.runtime.SideEffect {
                     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -84,7 +85,7 @@ class MainActivity : ComponentActivity() {
                         if (query.isNotBlank()) {
                             PreferenceScreen(0, rememberLazyListState(), query)
                         } else if (selected == com.akari.ppx.data.settingsCategories.size) {
-                            AboutScreen(isActiveState.value)
+                            AboutScreen(isActiveState.value, checkingUpdate, checkUpdate)
                         } else if (selected >= 0) {
                             PreferenceScreen(selected, rememberLazyListState())
                         } else {
