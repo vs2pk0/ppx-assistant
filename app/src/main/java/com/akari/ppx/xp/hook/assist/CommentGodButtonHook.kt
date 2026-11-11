@@ -24,6 +24,8 @@ import kotlin.math.roundToInt
 class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
     override fun onHook() {
         if (!supportsCommentActions("CommentGodButton")) return
+        val sentColorId = hostClass("com.sup.android.m_comment.R\$color")
+            .getStaticObjectFieldAs<Int>("btn_gradient_start")
         val commentIds = hostClass("com.sup.android.m_comment.R\$id")
         val likeId = commentIds.getStaticObjectFieldAs<Int>("detail_comment_like_layout")
         val countId = commentIds.getStaticObjectFieldAs<Int>("detail_comment_like_tv")
@@ -39,7 +41,7 @@ class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
                 val row = CommentGodAction.row(param.args[0].callMethodOrNull("getCellData"))
                 val nativeButton = root.findViewById<View>(nativeId)
                 val showExtra = nativeButton?.visibility != View.VISIBLE
-                bind(root, likeId, countId, row.takeIf { showExtra }, bottom = false)
+                bind(root, likeId, countId, sentColorId, row.takeIf { showExtra }, bottom = false)
             }
         }
 
@@ -52,11 +54,11 @@ class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
         bottom.getDeclaredMethod("a", cell, Boolean::class.java).hookAfterMethod { param ->
             if (param.throwable != null) return@hookAfterMethod
             val root = getBottom.invoke(param.thisObject) as? View ?: return@hookAfterMethod
-            bind(root, bottomLikeId, bottomCountId, CommentGodAction.row(param.args[0]), bottom = true)
+            bind(root, bottomLikeId, bottomCountId, sentColorId, CommentGodAction.row(param.args[0]), bottom = true)
         }
     }
 
-    private fun bind(root: View, likeId: Int, countId: Int, row: CommentGodAction.Row?, bottom: Boolean) {
+    private fun bind(root: View, likeId: Int, countId: Int, sentColorId: Int, row: CommentGodAction.Row?, bottom: Boolean) {
         val like = root.findViewById<View>(likeId) ?: return
         val actions = like.parent as? LinearLayout ?: return
         if (actions.orientation != LinearLayout.HORIZONTAL) return
@@ -68,7 +70,7 @@ class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
             return
         }
         val count = like.findViewById<TextView>(countId)
-        val button = existing ?: SendButton(actions.context).apply {
+        val button = existing ?: SendButton(actions.context, sentColorId).apply {
             tag = BUTTON_TAG
             val inline = !bottom && (like as? LinearLayout)?.orientation == LinearLayout.HORIZONTAL
             gravity = if (bottom) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.CENTER
@@ -99,8 +101,7 @@ class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
                 gravity = Gravity.CENTER_VERTICAL
             })
         }
-        count?.let { button.setTextColor(it.textColors) }
-        button.compoundDrawableTintList = button.textColors
+        count?.let { button.defaultColors = it.textColors }
         button.row = row
         button.visibility = View.VISIBLE
         updateLabel(button, row)
@@ -113,17 +114,23 @@ class CommentGodButtonHook : SwitchHook(CommentGod.BUTTON) {
     private fun updateLabel(button: SendButton, row: CommentGodAction.Row) {
         // A response can arrive after a holder has been recycled for a different row.
         if (button.row?.comment !== row.comment) return
-        button.text = when (CommentGodAction.status(row)) {
+        val status = CommentGodAction.status(row)
+        button.text = when (status) {
             2 -> "已送神"
             3 -> "已送满"
             else -> "送神"
         }
+        val colors = if (status == 2) button.sentColors else button.defaultColors
+        button.setTextColor(colors)
+        button.compoundDrawableTintList = colors
     }
 
     // This view uses the host's theme, which is not guaranteed to be AppCompat.
     @SuppressLint("AppCompatCustomView")
-    private class SendButton(context: Context) : TextView(context) {
+    private class SendButton(context: Context, sentColorId: Int) : TextView(context) {
         var row: CommentGodAction.Row? = null
+        val sentColors = context.getColorStateList(sentColorId)
+        var defaultColors = textColors
 
         fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
     }
