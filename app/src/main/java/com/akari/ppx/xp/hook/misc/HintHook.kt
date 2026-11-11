@@ -47,9 +47,7 @@ class HintHook : BaseHook {
         }
     }
 
-    private fun settingsReadable(): Boolean =
-        HookRuntime.remotePreferences() != null
-                || runCatching { XPrefs.prefs().file?.canRead() == true }.getOrDefault(false)
+    private fun settingsReadable(): Boolean = XPrefs.anySourceAvailable()
 
     private fun toast(activity: Activity, message: String) {
         activity.runOnUiThread {

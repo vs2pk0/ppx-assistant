@@ -9,8 +9,8 @@
 ## 设置与支持
 
 设置已按下载保存、广告过滤、评论发布、浏览播放、界面资料分类，支持全局搜索。
-自动操作尚未可靠适配，已隐藏整组设置并停用对应执行入口；历史自动开关不再触发操作。
-关于页列出适配版本（皮皮虾 6.2.0、6.5.0、6.5.5），提供 [酷安主页](https://www.coolapk.com/u/270261) 和赞赏入口。
+「评论与发布」新增自动送神评，默认关闭，支持首楼、首批评论中点赞最多或指定楼层。该功能适配皮皮虾 6.5.5、6.6.1。
+关于页列出适配版本，提供 [酷安主页](https://www.coolapk.com/u/270261) 和赞赏入口。
 支付宝可跳转收款金额输入页；微信请保存收款码后打开扫一扫，从相册识别。赞赏金额由用户在支付应用中填写并确认。
 
 分享菜单新增“转发到发帖页”，可带入原文字、全部图片或视频，进入编辑页后由用户确认发布。
@@ -24,7 +24,7 @@
 本次整理保留了原项目的整体思路，并在此基础上补充了：
 
 - 现代 `libxposed` 入口与运行时桥接
-- `LSPosed 1.9.x` legacy 与 `LSPosed 2.0` modern 双线兼容
+- `LSPosed 1.9.x` legacy 与支持 API 102 的 modern 框架双线兼容
 - 新版本皮皮虾适配与一轮功能修复
 - 更清晰的文档与构建产物归档
 
@@ -32,10 +32,14 @@
 
 ## 兼容范围
 
-- 宿主适配目标：`皮皮虾 6.2.0 / 6.5.0 / 6.5.5`
+- 宿主适配目标：`皮皮虾 6.2.0 / 6.5.0 / 6.5.5 / 6.6.1`
 - 框架兼容：
   - `LSPosed 1.9.x` -> legacy Xposed API 93
-  - `LSPosed 2.0` -> modern libxposed API 101
+  - 支持 libxposed API 102 的框架 -> modern libxposed API 102（API / Service 均为 `102.0.0`）
+
+现代入口的最低 API 与目标 API 均为 102，使用较旧 modern 框架时需先升级框架。现代入口只使用 libxposed Hook 和远程配置通道，不回退到旧版 `XSharedPreferences`；旧版 API 仍由独立 legacy 入口使用。升级 APK 后请重启皮皮虾，本次未启用热重载。
+
+Service 102 要求使用 Android SDK 37 编译，构建工具相应升级为 AGP `9.2.1`、Gradle `9.4.1` 和 Kotlin / Compose 编译插件 `2.2.10`。
 
 ## 26.10.17
 
@@ -58,13 +62,13 @@
 ## 项目结构
 
 - `app/`：主模块源码
-- `xposed-modern-api101-entry/`：modern API 101 入口
+- `xposed-modern-api102-entry/`：modern API 102 入口
 - `buildSrc/`：Gradle 版本与构建辅助
 - `tools/`：构建镜像同步脚本
 
 ## 构建
 
-需要 JDK 17、Android SDK 36，并在本机 `local.properties` 中配置 `sdk.dir`。
+需要 JDK 17、Android SDK 37，并在本机 `local.properties` 中配置 `sdk.dir`。
 
 macOS / Linux：
 
@@ -106,7 +110,7 @@ Release APK 输出：
 
 ## 下载
 
-已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 和 [LSPosed 收录仓库](https://github.com/Xposed-Modules-Repo/io.github.vs2pk0.piyou/releases) 分发，应用内检查更新以 LSPosed 收录仓库为准。当前版本为 `0.0.9`，使用 `0.0.x` 命名，内部版本号保持递增。`0.0.1` 构建在应用更名时取消，未发布安装包。
+已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 和 [LSPosed 收录仓库](https://github.com/Xposed-Modules-Repo/io.github.vs2pk0.piyou/releases) 分发，应用内检查更新以 LSPosed 收录仓库为准。当前版本为 [0.0.12](docs/releases/0.0.12.md)，使用 `0.0.x` 命名，内部版本号保持递增。`0.0.1` 构建在应用更名时取消，未发布安装包。
 
 发布时先更新 `app/build.gradle.kts` 中的版本名和版本号，再添加 `docs/releases/<版本>.md` 更新说明。推送对应的 `v<版本>` 标签后，Actions 自动运行测试、lint 和签名构建，并发布带中文更新说明的 Release、APK 和 SHA-256 校验文件；Actions 摘要也会显示更新内容。手动运行工作流时填写已存在的版本标签。
 

@@ -6,6 +6,8 @@ import com.akari.ppx.data.Const.TARGET_APP_ID
 import com.akari.ppx.utils.Log
 import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CopyOnWriteArraySet
 
 object FrameworkScopeState {
@@ -32,7 +34,17 @@ object FrameworkScopeState {
                 override fun onServiceBind(service: XposedService) {
                     this@FrameworkScopeState.service = service
                     lastScope = readScope(service)
+                    // Republish on every (re)bind: a daemon that answered with
+                    // an empty group (seen on some 2.x builds after an update)
+                    // leaves the host reading defaults, i.e. "settings do
+                    // nothing", until the next explicit save.
                     Prefs.syncRemote(service.getRemotePreferences(PREFS_NAME))
+                    verifyRemote(service)
+                    // The framework service is the only writer of the module
+                    // files dir, so refresh the snapshot used by the hooks as
+                    // soon as it is available.
+                    runCatching { Prefs.syncMirror() }.onFailure(Log::e)
+                    runCatching { Prefs.probeSyncStatus() }.onFailure(Log::e)
                     Log.i("FrameworkScopeState bound scope=$lastScope")
                     notifyListeners()
                 }
@@ -67,6 +79,30 @@ object FrameworkScopeState {
         }
         val scope = lastScope ?: return null
         return scope.contains(TARGET_APP_ID)
+    }
+
+    /** Live framework service, used to publish files the hooks can read. */
+    fun service(): XposedService? = service
+
+    /**
+     * Confirms the daemon actually stored our settings, and republishes once
+     * when it reports an empty group. This is the field failure where the
+     * module UI shows every switch on, yet the hooked app behaves as if all of
+     * them were off.
+     */
+    private fun verifyRemote(service: XposedService) {
+        runCatching {
+            val remote = service.getRemotePreferences(PREFS_NAME)
+            val remoteKeys = remote?.all?.size ?: 0
+            Log.i("FrameworkScopeState remote keys=$remoteKeys")
+            if (remoteKeys > 0) return
+            val wanted = runBlocking { Prefs.dataStore.data.first().asMap().size }
+            if (wanted <= 0) return
+            Log.w("FrameworkScopeState remote group empty, republishing $wanted settings")
+            Prefs.syncRemote(remote)
+            val after = runCatching { remote?.all?.size ?: 0 }.getOrDefault(0)
+            Log.i("FrameworkScopeState republish result keys=$after")
+        }.onFailure(Log::e)
     }
 
     fun remotePreferences(): SharedPreferences? = runCatching {

@@ -3,8 +3,10 @@ plugins {
 }
 
 android {
-    namespace = "com.akari.ppx.xp.modern.api101"
-    compileSdk = 36
+    namespace = "com.akari.ppx.xp.modern.api102"
+    compileSdk {
+        version = release(37)
+    }
 
     defaultConfig {
         minSdk = 26

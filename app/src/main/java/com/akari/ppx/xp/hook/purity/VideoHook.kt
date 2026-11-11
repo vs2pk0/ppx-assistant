@@ -3,7 +3,6 @@
 package com.akari.ppx.xp.hook.purity
 
 import android.content.Context
-import android.util.Base64
 import com.google.gson.JsonElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -694,24 +693,7 @@ class VideoHook : SwitchHook("save_video") {
         return 0L
     }
 
-    private fun resolveDownloadUrlByUri(uri: String): String {
-        val ts = System.currentTimeMillis()
-        val signature = "com.bytedance.common.utility.DigestUtils".findClass(cl).callStaticMethod(
-            "md5Hex",
-            "ts${ts}userbdsversion1video${uri}vtypemp4f425df23905d4ee38685e276072faa0c"
-        ) as String
-        val requestUrl = "https://i.snssdk.com/video/play/1/bds/$ts/$signature/mp4/$uri"
-        Log.d(
-            "VideoHook resolveDownloadUrlByUri request uri=${shortValue(uri)} ts=$ts sign=${signature.take(12)} " +
-                    "url=${shortValue(requestUrl, 180)}"
-        )
-        val response = httpGet(requestUrl)
-        val decodedUrl = decodeMaxQualityUrl(response)
-        Log.d(
-            "VideoHook resolveDownloadUrlByUri decoded uri=${shortValue(uri)} url=${shortValue(decodedUrl, 180)}"
-        )
-        return decodedUrl
-    }
+    private fun resolveDownloadUrlByUri(uri: String): String = CleanVideoSource.resolve(uri)
 
     private fun rewriteVideoModel(videoModel: Any, url: String, tag: String) {
         val urlList = videoModel.callMethodAs<List<*>>("getUrlList")
@@ -772,14 +754,5 @@ class VideoHook : SwitchHook("save_video") {
         }
     }
 
-    private fun decodeMaxQualityUrl(response: String): String {
-        val videoList = response.fromJsonElement()["video_info"]["data"]["video_list"]
-        for (index in 5 downTo 0) {
-            val encoded = runCatching { videoList["video_$index"]["main_url"].asString }.getOrNull()
-            if (!encoded.isNullOrEmpty()) {
-                return String(Base64.decode(encoded, 0))
-            }
-        }
-        throw IllegalArgumentException("VideoHook main_url missing")
-    }
+
 }

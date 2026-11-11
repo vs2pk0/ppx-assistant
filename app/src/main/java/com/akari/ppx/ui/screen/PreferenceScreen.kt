@@ -29,13 +29,6 @@ import com.akari.ppx.utils.get
 import com.akari.ppx.utils.splitByOr
 import com.akari.ppx.utils.toJson
 
-val channelItems by lazy {
-    Prefs.get<String>(CHANNEL_KEY)?.fromJsonList<ChannelItem>()?.toMutableStateList() ?: run {
-        Prefs.set(CHANNEL_KEY, CHANNEL_DEFAULT.toJson())
-        CHANNEL_DEFAULT.toMutableStateList()
-    }
-}
-
 @Composable
 fun PreferenceItem(
     preference: Preference.PreferenceItem<*>,
@@ -94,12 +87,9 @@ fun PreferenceItem(
             )
         }
         is Preference.PreferenceItem.CheckboxListPreference -> {
-            val items by lazy {
-                Prefs.get<String>(preference.key)?.fromJsonList<CheckBoxItem>()
-                    ?.toMutableStateList() ?: run {
-                    Prefs.set(preference.key, preference.items.toJson())
-                    preference.items
-                }
+            val raw = prefs?.get(stringPreferencesKey(preference.key)) ?: Prefs.get<String>(preference.key)
+            val items = androidx.compose.runtime.remember(raw) {
+                raw?.fromJsonList<CheckBoxItem>()?.toMutableStateList() ?: preference.items.toMutableStateList()
             }
             CheckBoxListPreferenceWidget(
                 preference = preference,
@@ -110,6 +100,10 @@ fun PreferenceItem(
             )
         }
         is Preference.PreferenceItem.ChannelListPreference -> {
+            val raw = prefs?.get(stringPreferencesKey(CHANNEL_KEY)) ?: Prefs.get<String>(CHANNEL_KEY)
+            val channelItems = androidx.compose.runtime.remember(raw) {
+                raw?.fromJsonList<ChannelItem>()?.toMutableStateList() ?: CHANNEL_DEFAULT.toMutableStateList()
+            }
             ChannelListPreferenceWidget(
                 preference = preference,
                 value = prefs?.get(booleanPreferencesKey(preference.key)) ?: false,
@@ -132,18 +126,29 @@ fun PreferenceScreen(
     state: LazyListState,
     query: String = ""
 ) {
-    val visible = (if (query.isBlank()) settingsCategories[index].items else settingsCategories.flatMap { it.items }).filter { item ->
-        query.isBlank() || when (item) {
-            is SwitchItem -> "${item.title} ${item.summary}".contains(query, true)
-            is TextItem -> "${item.title} ${item.summary}".contains(query, true)
-            is EditItem -> item.title.contains(query, true)
-            is ListItem -> item.title.contains(query, true)
-            is ColorItem -> item.title.contains(query, true)
-            is CheckBoxListItem -> item.title.contains(query, true)
-            is ChannelListItem -> item.title.contains(query, true)
-            else -> false
+    val categories = if (query.isBlank()) listOf(settingsCategories[index]) else settingsCategories
+    val prefs by Prefs.dsData.collectAsState(initial = null)
+    val showSendGodFloor = prefs?.get(stringPreferencesKey(AutoSendGod.MODE)) == AutoSendGod.SPECIFIED
+    val sections = categories.flatMap { category ->
+        category.sections.map { section ->
+            section.copy(
+                title = if (query.isBlank()) section.title else "${category.title} · ${section.title}",
+                items = section.items.filter { item ->
+                    if (item.settingKey() == AutoSendGod.FLOOR && !showSendGodFloor) return@filter false
+                    query.isBlank() || when (item) {
+                        is SwitchItem -> "${item.title} ${item.summary}".contains(query, true)
+                        is TextItem -> "${item.title} ${item.summary}".contains(query, true)
+                        is EditItem -> item.title.contains(query, true)
+                        is ListItem -> item.title.contains(query, true)
+                        is ColorItem -> item.title.contains(query, true)
+                        is CheckBoxListItem -> item.title.contains(query, true)
+                        is ChannelListItem -> item.title.contains(query, true)
+                        else -> false
+                    }
+                }
+            )
         }
-    }
+    }.filter { it.items.isNotEmpty() }
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -154,89 +159,100 @@ fun PreferenceScreen(
     ) {
         item {
             Text(if (query.isBlank()) settingsCategories[index].title
-                else "${visible.size} 项匹配功能",
+                else "${sections.sumOf { it.items.size }} 项匹配功能",
                 Modifier.padding(vertical = 12.dp), fontWeight = FontWeight.Bold)
         }
-        visible.map { item ->
+        sections.forEach { section ->
+            item(key = "section:${section.title}") {
+                Text(
+                    section.title,
+                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.subtitle2,
+                    color = MaterialTheme.colors.primary
+                )
+            }
+            section.items.forEach { item ->
 
-            when (item) {
-                is ColorItem -> item {
-                    val prefs by Prefs.dsData.collectAsState(initial = null)
-                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colors.surface) {
-                        ColorPreferenceWidget(
-                            preference = item,
-                            value = prefs?.get(stringPreferencesKey(item.key)) ?: item.default,
-                            onValueChange = { Prefs.set(item.key, it) }
+                when (item) {
+                    is ColorItem -> item(key = item.settingKey()) {
+                        val prefs by Prefs.dsData.collectAsState(initial = null)
+                        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colors.surface) {
+                            ColorPreferenceWidget(
+                                preference = item,
+                                value = prefs?.get(stringPreferencesKey(item.key)) ?: item.default,
+                                onValueChange = { Prefs.set(item.key, it) }
+                            )
+                        }
+                    }
+                    is TextItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.TextPreference(
+                                title = item.title,
+                                summary = item.summary,
+                                onClick = item.onClick
+                            )
                         )
                     }
-                }
-                is TextItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.TextPreference(
-                            title = item.title,
-                            summary = item.summary,
-                            onClick = item.onClick
+                    is SwitchItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.SwitchPreference(
+                                key = item.key,
+                                title = item.title,
+                                summary = item.summary,
+                                dependency = item.dependency,
+                                onClick = item.onClick
+                            )
                         )
-                    )
-                }
-                is SwitchItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.SwitchPreference(
-                            key = item.key,
-                            title = item.title,
-                            summary = item.summary,
-                            dependency = item.dependency,
-                            onClick = item.onClick
+                    }
+                    is EditItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.EditPreference(
+                                key = item.key,
+                                title = item.title,
+                                default = item.default,
+                                multi = item.multi,
+                                positiveInteger = item.positiveInteger,
+                                dependency = item.dependency
+                            )
                         )
-                    )
-                }
-                is EditItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.EditPreference(
-                            key = item.key,
-                            title = item.title,
-                            default = item.default,
-                            multi = item.multi,
-                            dependency = item.dependency
+                    }
+                    is ListItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.ListPreference(
+                                key = item.key,
+                                title = item.title,
+                                default = item.default,
+                                entries = item.entries,
+                                summary = item.summary,
+                                dependency = item.dependency
+                            )
                         )
-                    )
-                }
-                is ListItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.ListPreference(
-                            key = item.key,
-                            title = item.title,
-                            default = item.default,
-                            entries = item.entries,
-                            summary = item.summary,
-                            dependency = item.dependency
+                    }
+                    is CheckBoxListItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.CheckboxListPreference(
+                                key = item.key,
+                                title = item.title,
+                                summary = item.summary,
+                                items = item.items,
+                                dependency = item.dependency
+                            )
                         )
-                    )
-                }
-                is CheckBoxListItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.CheckboxListPreference(
-                            key = item.key,
-                            title = item.title,
-                            summary = item.summary,
-                            items = item.items,
-                            dependency = item.dependency
+                    }
+                    is ChannelListItem -> item(key = item.settingKey()) {
+                        PreferenceItem(
+                            Preference.PreferenceItem.ChannelListPreference(
+                                key = item.key,
+                                title = item.title,
+                                dialogTitle = item.dialogTitle,
+                                summary = item.summary,
+                                dependency = item.dependency
+                            )
                         )
-                    )
-                }
-                is ChannelListItem -> item {
-                    PreferenceItem(
-                        Preference.PreferenceItem.ChannelListPreference(
-                            key = item.key,
-                            title = item.title,
-                            dialogTitle = item.dialogTitle,
-                            summary = item.summary,
-                            dependency = item.dependency
-                        )
-                    )
-                }
-                ItemDivider -> item {
-                    Divider()
+                    }
+                    ItemDivider -> item {
+                        Divider()
+                    }
                 }
             }
         }

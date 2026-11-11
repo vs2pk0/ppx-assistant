@@ -29,6 +29,7 @@ sealed class Preference {
             val key: String,
             val default: String,
             val multi: Boolean,
+            val positiveInteger: Boolean = false,
 
             override val title: String,
             override val summary: String? = null,

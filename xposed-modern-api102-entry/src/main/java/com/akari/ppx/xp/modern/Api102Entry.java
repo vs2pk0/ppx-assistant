@@ -6,7 +6,7 @@ import java.lang.reflect.Method;
 
 import io.github.libxposed.api.XposedModule;
 
-public class Api101Entry extends XposedModule {
+public class Api102Entry extends XposedModule {
     private static final String TAG = "PPXPPX";
 
     @Override
@@ -34,7 +34,7 @@ public class Api101Entry extends XposedModule {
             }
             method.invoke(null, args);
         } catch (Throwable t) {
-            Log.e(TAG, "Api101Entry bridge failed", t);
+            Log.e(TAG, "Api102Entry bridge failed", t);
         }
     }
 }

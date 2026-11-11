@@ -1,10 +1,11 @@
 import org.gradle.api.tasks.Copy
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.*
 
 plugins {
     id("com.android.application")
-    kotlin("android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val properties = Properties()
@@ -12,11 +13,13 @@ project.rootProject.file("local.properties").takeIf { it.exists() }?.inputStream
     properties.load(it)
 }
 
-val verCode = 20261017
-val verName = "0.0.9"
+val verCode = 20261111
+val verName = "0.0.12"
 
 android {
-    compileSdk = 36
+    compileSdk {
+        version = release(37)
+    }
 
     namespace = "com.akari.ppx"
 
@@ -61,15 +64,9 @@ android {
         sourceCompatibility(JavaVersion.VERSION_17)
         targetCompatibility(JavaVersion.VERSION_17)
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         buildConfig = true
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
     }
     packaging {
         resources {
@@ -94,8 +91,8 @@ dependencies {
     implementation("io.noties.markwon:core:4.6.2")
     compileOnly(Libs.xposed_api)
     compileOnly(Libs.libxposed_api)
-    implementation(project(":xposed-modern-api101-entry"))
-    implementation("io.github.libxposed:service:101.0.0") {
+    implementation(project(":xposed-modern-api102-entry"))
+    implementation("io.github.libxposed:service:102.0.0") {
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
     }
     api(Libs.gson)
@@ -111,9 +108,9 @@ dependencies {
 }
 
 tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs = freeCompilerArgs + listOf(
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material.ExperimentalMaterialApi",
             "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
             "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
@@ -121,7 +118,7 @@ tasks.withType<KotlinCompile>().configureEach {
         )
 
         if (name.contains("release", true)) {
-            freeCompilerArgs = freeCompilerArgs + listOf(
+            freeCompilerArgs.addAll(
                 "-Xassertions=always-disable",
                 "-Xno-param-assertions",
                 "-Xno-call-assertions",

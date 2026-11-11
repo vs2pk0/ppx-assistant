@@ -12,6 +12,7 @@ import com.akari.ppx.utils.*
 import com.akari.ppx.xp.Init
 import com.akari.ppx.xp.ModuleEntryBridge
 import com.akari.ppx.xp.hook.BaseHook
+import com.akari.ppx.data.XPrefs
 import java.util.WeakHashMap
 
 /** Keep the original share actions intact and handle copy before the host's PI callback. */
@@ -142,6 +143,23 @@ class ShareActionsHook : BaseHook {
         parent.removeView(functions)
         val row = LinearLayout(dialog.context).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(button)
+        if (XPrefs<Boolean>("enable_custom_video") && CleanVideoSource.from(cell) != null) {
+            val save = android.view.LayoutInflater.from(dialog.context).inflate(
+                layout.getStaticObjectFieldAs<Int>("share_optimize_dialog_functions_collect_item"), row, false)
+            val saveHolder = "com.sup.android.m_sharecontroller.adapter.SharePlatformFunctionsViewHolder"
+                .findClass(Init.cl).new(save)!!
+            val saveAction = "com.sup.android.i_sharecontroller.model.OptionAction\$OptionActionType"
+                .findClass(Init.cl).getStaticObjectField("ACTION_SAVE")
+            saveHolder.callMethod("a", 0, 2, saveAction)
+            save.findViewById<TextView>(ids.getStaticObjectFieldAs<Int>("dialog_functions_item_content")).text = "存视频"
+            save.contentDescription = "保存到自定义视频"
+            save.setOnClickListener {
+                runCatching { CustomVideos.save(dialog.context, cell) }
+                    .onSuccess { dialog.dismiss() }
+                    .onFailure { Log.e(it); dialog.context.showToast(it.message ?: "暂时无法保存") }
+            }
+            row.addView(save)
+        }
         row.addView(functions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         parent.addView(row, index, originalParams)
         Log.i("ShareActions attached cell=${cell.javaClass.simpleName}")

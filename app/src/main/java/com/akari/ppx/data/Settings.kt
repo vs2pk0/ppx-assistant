@@ -6,6 +6,8 @@ import com.akari.ppx.data.Const.CATEGORY_TYPES
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.utils.hideIcon
 import com.akari.ppx.utils.FemalePromptColors
+import com.akari.ppx.ui.importBackupRequest
+import com.akari.ppx.ui.openRuntimeLog
 
 val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
     when (Page.fromIndex(index)) {
@@ -203,9 +205,53 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     summary = "长按评论表情可一键收藏到官方表情和自定义分组"
                 ),
                 SwitchItem(
+                    key = "enable_custom_video",
+                    title = "自定义视频分组",
+                    summary = "评论工具栏新增视频库，分享菜单保存无水印视频并显示下载进度"
+                ),
+                TextItem(
+                    key = "storage_dir",
+                    title = "自定义数据目录",
+                    summary = "设置、表情、视频与备份统一保存在可见的 Android/media 目录，可在此修改",
+                    onClick = { com.akari.ppx.ui.showStorageDirDialog(it) }
+                ),
+                TextItem(
+                    key = "export_backup",
+                    title = "导出完整备份（设置 + 表情 + 视频）",
+                    summary = "ZIP 包含模块设置、表情分组和原文件、视频分组、视频及封面；显示处理进度",
+                    onClick = { com.akari.ppx.ui.exportBackup(it) }
+                ),
+                TextItem(
+                    key = "import_backup",
+                    title = "导入备份",
+                    summary = "从 ZIP 恢复设置和全部媒体，校验后按分组合并；兼容旧 JSON，完成后重启皮皮虾",
+                    onClick = { importBackupRequest.get()?.invoke() }
+                ),
+                SwitchItem(
                     key = "unlock_send_god_limit",
                     title = "解除神评已送满限制",
                     summary = "显示已送满评论的送神入口，结果以服务器为准"
+                ),
+                SwitchItem(
+                    key = AutoSendGod.ENABLED,
+                    title = "自动送神评",
+                    summary = "打开评论区时使用当前账号送神，每帖在本次运行中最多尝试一次。开启后重启皮皮虾。"
+                ),
+                ListItem(
+                    key = AutoSendGod.MODE,
+                    title = "送神目标",
+                    entries = mapOf(
+                        "第一楼（默认）" to AutoSendGod.FIRST,
+                        "点赞最多" to AutoSendGod.MOST_LIKED,
+                        "指定楼层" to AutoSendGod.SPECIFIED
+                    ),
+                    summary = "按首批一级评论计算，点赞相同时取靠前的一楼"
+                ),
+                EditItem(
+                    key = AutoSendGod.FLOOR,
+                    title = "送神楼层",
+                    default = "1",
+                    positiveInteger = true
                 ),
                 SwitchItem(
                     key = "unlock_video_comment_limit",
@@ -470,6 +516,13 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     onClick = ::hideIcon
                 ),
                 ItemDivider,
+                TextItem(
+                    key = "runtime_log",
+                    title = "运行日志",
+                    summary = "查看模块加载、设置读取与功能执行记录",
+                    onClick = { openRuntimeLog(it) }
+                ),
+                ItemDivider,
                 SwitchItem(
                     key = "remove_bottom_view",
                     title = "去除底栏"
@@ -503,7 +556,39 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 ),
                 SwitchItem(
                     key = "remove_detail_bottom_view",
-                    title = "去除评论页底栏"
+                    title = "去除评论页底栏",
+                    summary = "会同时隐藏详情页底部的回复输入框和操作栏；需要底部回复入口时请关闭，重启皮皮虾生效"
+                ),
+                ItemDivider,
+                SwitchItem(
+                    key = "show_mine_settings_entry",
+                    title = "显示我的页-设置入口",
+                    summary = "在皮友助手下方显示独立的设置横行，隐藏更多功能后仍可打开皮皮虾设置；重启皮皮虾生效"
+                ),
+                SwitchItem(
+                    key = "hide_mine_pet_entry",
+                    title = "隐藏我的页-宠物乐园",
+                    summary = "隐藏我的页顶部「进入宠物乐园」横幅"
+                ),
+                SwitchItem(
+                    key = "hide_mine_history_entry",
+                    title = "隐藏我的页-历史记录",
+                    summary = "隐藏我的页「历史记录」整行"
+                ),
+                SwitchItem(
+                    key = "hide_mine_welfare_entry",
+                    title = "隐藏我的页-福利中心",
+                    summary = "隐藏我的页「福利中心」整行"
+                ),
+                SwitchItem(
+                    key = "hide_mine_create_center",
+                    title = "隐藏我的页-创作中心",
+                    summary = "隐藏我的页「创作中心」整行"
+                ),
+                SwitchItem(
+                    key = "hide_mine_more_functions",
+                    title = "隐藏我的页-更多功能",
+                    summary = "隐藏我的页「更多功能」整块（神评鉴定 / 设置）"
                 ),
                 ItemDivider,
                 SwitchItem(
@@ -597,6 +682,7 @@ enum class Page(val index: Int) {
 sealed interface PrefItem
 
 class TextItem(
+    val key: String = "",
     val title: String,
     val summary: String? = null,
     val onClick: (Context) -> Unit = { }
@@ -615,7 +701,8 @@ class EditItem(
     val title: String,
     val default: String = "",
     val multi: Boolean = false,
-    val dependency: String? = null
+    val dependency: String? = null,
+    val positiveInteger: Boolean = false
 ) : PrefItem
 
 class ListItem(
@@ -653,9 +740,18 @@ class ChannelListItem(
 object ItemDivider : PrefItem
 
 // 分类只组织展示，保持原有配置键与 Hook 配置兼容。
-data class SettingsCategory(val title: String, val description: String, val items: List<PrefItem>)
+data class SettingsSection(val title: String, val items: List<PrefItem>)
+
+data class SettingsCategory(
+    val title: String,
+    val description: String,
+    val sections: List<SettingsSection>
+) {
+    val items: List<PrefItem> get() = sections.flatMap { it.items }
+}
 
 fun PrefItem.settingKey(): String = when (this) {
+    is TextItem -> key
     is SwitchItem -> key
     is EditItem -> key
     is ListItem -> key
@@ -669,19 +765,53 @@ val settingsCategories: List<SettingsCategory> by lazy {
     val all = prefItems.flatten().filterNotNull().filter {
         it !== ItemDivider && AutomationAvailability.isSettingAvailable(it.settingKey())
     }
-    val downloads = setOf("save_image", "save_video", "save_audio", "copy_item", "remove_download_restrictions")
-    val comments = setOf("comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_1080p_limit", "unlock_highlight", "unlock_emoji_limit", "enable_custom_emoticon", "batch_collect_emoticon", "unlock_send_god_limit", "enable_show_location_label")
-    val interfaceKeys = prefItems[3].filterNotNull().map { it.settingKey() }.toSet() + setOf("modify_channels", "default_channel", "enable_double_layout_style", "enable_old_god_icon_style", "use_feed_footer_new_style", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
-    val autoKeys = prefItems[2].filterNotNull().map { it.settingKey() }.toSet()
-    val filterKeys = prefItems[0].filterNotNull().map { it.settingKey() }.toSet() - downloads - interfaceKeys
-    val groups = listOf(
-        Triple("下载与保存", "图片、动图、视频、音频与文字", downloads),
-        Triple("广告与内容过滤", "去广告、去红点、帖子与评论过滤", filterKeys),
-        Triple("评论与发布", "评论颜色、楼中楼视频、发布限制", comments),
-        Triple("浏览与播放", "视频倍速、弹幕、时间与用户信息", all.map { it.settingKey() }.toSet() - downloads - filterKeys - comments - interfaceKeys - autoKeys),
-        Triple("自动操作", "自动浏览、点赞、评论与插眼", autoKeys),
-        Triple("界面与个人资料", "频道布局、消息角标、本机资料与图标", interfaceKeys)
+    val byKey = all.associateBy { it.settingKey() }
+    fun section(title: String, vararg keys: String) = SettingsSection(
+        title, keys.map { byKey.getValue(it) }
     )
-    groups.map { (title, description, keys) -> SettingsCategory(title, description, all.filter { it.settingKey() in keys }) }
-        .filter { it.items.isNotEmpty() }
+    listOf(
+        SettingsCategory("首页与导航", "频道排序、首页入口、底部导航与红点", listOf(
+            section("频道与布局", "modify_channels", "default_channel", "enable_double_layout_style"),
+            section("首页入口", "remove_stories", "hide_home_game_entry", "hide_coin_float_ball"),
+            section("底部导航", "remove_bottom_view", "hide_bottom_topic_tab", "hide_bottom_message_tab", "remove_welfare_entry", "remove_publish_button"),
+            section("红点与角标", "remove_red_dots", "modify_message_counts")
+        )),
+        SettingsCategory("帖子与内容过滤", "广告屏蔽、帖子过滤与赞踩样式", listOf(
+            section("广告过滤", "remove_ads"),
+            section("帖子过滤", "remove_feeds", "remove_feeds_keywords", "remove_feeds_users", "remove_official_feeds", "remove_promotional_feeds", "remove_live_feeds"),
+            section("帖子操作栏", "use_feed_footer_new_style", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
+        )),
+        SettingsCategory("评论与发布", "评论过滤、显示样式、评论能力与发帖", listOf(
+            section("评论过滤", "remove_comments", "remove_comments_keywords", "remove_comments_users"),
+            section("评论显示", "remove_detail_bottom_view", "enable_old_god_icon_style", "enable_female_prompt", "female_prompt_color", "show_exact_comment_time", "recent_time_format", "exact_time_format"),
+            section("评论功能", "comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_highlight", "unlock_send_god_limit"),
+            section("自动送神评", AutoSendGod.ENABLED, AutoSendGod.MODE, AutoSendGod.FLOOR),
+            section("发帖功能", "unlock_1080p_limit", "enable_show_location_label")
+        )),
+        SettingsCategory("视频与弹幕", "播放倍速、划动防误触与弹幕功能", listOf(
+            section("视频播放", "normal_play_speed", "pressed_play_speed", "keep_video_play_speed", "prevent_mistouch"),
+            section("弹幕功能", "unlock_danmaku", "query_danmaku_sender")
+        )),
+        SettingsCategory("下载与分享", "图片、视频、音频保存与分享面板", listOf(
+            section("下载与保存", "remove_download_restrictions", "save_image", "save_video", "save_audio"),
+            section("分享面板", "copy_item", "simplify_share")
+        )),
+        SettingsCategory("表情与视频", "自定义表情、视频分组与收藏管理", listOf(
+            section("分组与收藏", "enable_custom_emoticon", "batch_collect_emoticon", "unlock_emoji_limit"),
+            section("自定义视频", "enable_custom_video")
+        )),
+        SettingsCategory("我的与个人资料", "我的页入口、用户查询与本机资料", listOf(
+            section("我的页入口", "show_mine_settings_entry", "hide_mine_pet_entry", "hide_mine_history_entry", "hide_mine_welfare_entry", "hide_mine_create_center", "hide_mine_more_functions"),
+            section("用户信息", "show_register_escape_time", "unlock_search_user_limits", "remove_avatar_decoration"),
+            section("本机资料自定义", "customize", "username", "description", "certify_type", "certify_desc", "like_count", "followers_count", "following_count", "point", "enter_black_house")
+        )),
+        SettingsCategory("启动与隐私", "启动展示、提示弹窗、更新与浏览记录", listOf(
+            section("启动与提示", "skip_splash", "remove_teenager_dialog", "remove_privacy_dialog", "disable_update"),
+            section("浏览记录", "disable_history_items")
+        )),
+        SettingsCategory("模块与备份", "数据目录、备份恢复、桌面图标与日志", listOf(
+            section("数据与备份", "storage_dir", "export_backup", "import_backup"),
+            section("模块设置", "hide_icon", "runtime_log")
+        ))
+    )
 }

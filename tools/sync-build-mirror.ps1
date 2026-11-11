@@ -36,7 +36,7 @@ $cleanupDirectories = @(
     "buildSrc\.gradle",
     "buildSrc\build",
     "app\build",
-    "xposed-modern-api101-entry\build",
+    "xposed-modern-api102-entry\build",
     "c"
 )
 
@@ -69,7 +69,7 @@ $robocopyArgs = @(
     "app\build",
     "buildSrc\.gradle",
     "buildSrc\build",
-    "xposed-modern-api101-entry\build",
+    "xposed-modern-api102-entry\build",
     "/XF",
     "local.properties",
     "*.iml",

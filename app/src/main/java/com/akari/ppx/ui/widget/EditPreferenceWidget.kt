@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import com.akari.ppx.data.Preference
 import com.akari.ppx.data.Prefs
@@ -38,9 +39,12 @@ fun EditPreferenceWidget(
     )
     if (isDialogShown) {
         var text by rememberState(value = value)
+        val valid = !preference.positiveInteger || (text.trim().toIntOrNull() ?: 0) > 0
         val submit = {
-            onValueChange(text)
-            changeDialogShown()
+            if (valid) {
+                onValueChange(if (preference.positiveInteger) text.trim() else text)
+                changeDialogShown()
+            }
         }
         AlertDialog(
             onDismissRequest = { changeDialogShown() },
@@ -52,6 +56,7 @@ fun EditPreferenceWidget(
             },
             confirmButton = {
                 TextButton(
+                    enabled = valid,
                     onClick = {
                         submit()
                     }
@@ -88,7 +93,11 @@ fun EditPreferenceWidget(
                     },
                     modifier = Modifier
                         .fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    singleLine = preference.positiveInteger,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = if (preference.positiveInteger) KeyboardType.Number else KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    ),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     cursorBrush = SolidColor(MaterialTheme.colors.primary)
                 )

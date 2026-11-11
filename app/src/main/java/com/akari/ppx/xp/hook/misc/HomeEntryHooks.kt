@@ -3,7 +3,6 @@
 package com.akari.ppx.xp.hook.misc
 
 import android.view.View
-import android.view.ViewGroup
 import com.akari.ppx.utils.findClass
 import com.akari.ppx.utils.hookAfterAllConstructors
 import com.akari.ppx.utils.hookAfterMethod
@@ -57,18 +56,11 @@ class HomeGameEntryHook : SwitchHook("hide_home_game_entry") {
     }
 }
 
-/** The draggable coin floating ball above the vote row is MoneyIconController
- * (dex `m_integral.view.d`) wrapping `MoneyExcitingUtil.addViewToParent`. */
+/** MoneyExcitingService adds the coin view before constructing MoneyIconController
+ * (runtime class `m_integral.view.d`), so hiding its root also covers re-creation. */
 class CoinFloatBallHook : SwitchHook("hide_coin_float_ball") {
     override fun onHook() {
         "com.sup.android.m_integral.view.d".findClass(cl).hookAfterAllConstructors { param ->
-            (param.args[0] as? View)?.visibility = View.GONE
-        }
-        "com.sup.android.m_integral.money.MoneyExcitingUtil".findClass(cl).hookAfterMethod(
-            "addViewToParent",
-            View::class.java,
-            ViewGroup::class.java
-        ) { param ->
             (param.args[0] as? View)?.visibility = View.GONE
         }
     }

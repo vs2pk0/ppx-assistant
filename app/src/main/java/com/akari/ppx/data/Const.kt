@@ -8,6 +8,8 @@ object Const {
     const val PREFS_NAME = "settings"
     const val SETTINGS_REVISION = "settings_revision"
     const val CACHE_NAME = ".cache620v2"
+    /** Shared folder owned by the host app; visible over USB / file managers. */
+    const val SHARED_ROOT = "/storage/emulated/0/Android/media/$TARGET_APP_ID/$APP_NAME"
     const val CP_URI = "content://${com.akari.ppx.BuildConfig.APPLICATION_ID}.CP/"
     const val TAB_SCHEMA = "akari://open_zs"
     const val GIT_PAGE_URI = "https://github.com/vs2pk0/ppx-assistant"

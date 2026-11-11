@@ -39,14 +39,22 @@ class SettingsCategoryTest {
 
     @Test fun dependentEditorsStayWithTheirSwitches() {
         settingsCategories.forEach { category ->
-            category.items.forEach { item ->
-                val dependency = when (item) {
-                    is EditItem -> item.dependency
-                    is ListItem -> item.dependency
-                    is ColorItem -> item.dependency
-                    else -> null
+            category.sections.forEach { section ->
+                section.items.forEachIndexed { index, item ->
+                    val dependency = when (item) {
+                        is SwitchItem -> item.dependency
+                        is EditItem -> item.dependency
+                        is ListItem -> item.dependency
+                        is ColorItem -> item.dependency
+                        is CheckBoxListItem -> item.dependency
+                        is ChannelListItem -> item.dependency
+                        else -> null
+                    }
+                    if (dependency != null) {
+                        assertTrue("${item.settingKey()} must follow $dependency in ${section.title}",
+                            section.items.take(index).any { it.settingKey() == dependency })
+                    }
                 }
-                if (dependency != null) assertTrue("${item.settingKey()} missing $dependency", category.items.any { it.settingKey() == dependency })
             }
         }
     }

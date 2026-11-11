@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
         isActiveState.value = isModuleActive()
         setContent {
             BaseTheme {
+                rememberBackupImporter()
                 val (checkingUpdate, checkUpdate) = rememberAssistantUpdateCheck()
                 val launchScope = rememberCoroutineScope()
                 var opening by androidx.compose.runtime.remember { mutableStateOf(false) }
@@ -118,6 +119,11 @@ class MainActivity : ComponentActivity() {
                                             Text(if (isActiveState.value) "框架已启用助手" else "等待框架启用", fontWeight = FontWeight.Bold)
                                             Text("助手 ${com.akari.ppx.BuildConfig.VERSION_NAME} · 皮皮虾 $targetVersion")
                                             Text("已适配皮皮虾 $supportedVersionLabel；修改后需强行停止皮皮虾再打开；仅切换前后台不会重新加载设置。", style = MaterialTheme.typography.caption)
+                                            val sync by com.akari.ppx.data.Prefs.syncStatus
+                                            Text("设置同步：$sync", style = MaterialTheme.typography.caption,
+                                                color = if (sync.startsWith("同步正常") || sync == "尚未同步")
+                                                    MaterialTheme.colors.onSurface.copy(alpha = .6f)
+                                                else androidx.compose.ui.graphics.Color(0xFFEF6C00))
                                         }
                                     }
                                 }

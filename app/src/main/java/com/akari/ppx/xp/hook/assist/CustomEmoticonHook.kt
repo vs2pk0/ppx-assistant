@@ -1,11 +1,9 @@
 package com.akari.ppx.xp.hook.assist
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -15,16 +13,22 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.GridLayout
+import android.widget.BaseAdapter
+import android.widget.AbsListView
+import android.widget.GridView
 import android.widget.HorizontalScrollView
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import com.akari.ppx.data.XPrefs
 import com.akari.ppx.utils.CustomEmoticon
 import com.akari.ppx.utils.EmoticonGroups
+import com.akari.ppx.utils.MediaSheets.showSheet
+import com.akari.ppx.utils.MediaSheets.sheetRow
+import com.akari.ppx.utils.MediaSheets.cardDialog
+import com.akari.ppx.utils.CommentToolbar
+import com.akari.ppx.utils.StoragePaths
 import com.akari.ppx.utils.callMethod
 import com.akari.ppx.utils.callMethodAs
 import com.akari.ppx.utils.callMethodOrNull
@@ -42,6 +46,7 @@ import com.akari.ppx.xp.Init.cl
 import com.akari.ppx.xp.hook.BaseHook
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Custom emoticon groups layered on the host's emoji panel:
@@ -60,6 +65,7 @@ class CustomEmoticonHook : BaseHook {
 
     private val panelViewRef = AtomicReference<WeakReference<View>?>(null)
     private val insertCallback = AtomicReference<WeakReference<Any>?>(null)
+    private val importingFavorites = AtomicBoolean(false)
 
     override fun onHook() {
         XPrefs<Boolean>("enable_custom_emoticon").check(true) {
@@ -116,47 +122,10 @@ class CustomEmoticonHook : BaseHook {
         }
     }
 
-    /** Adds a gradient "皮" button next to the assistant's 虎 anchor in the
-     * comment toolbar; positioned against the GIF anchor like QuickActionsHook. */
     private fun setupToolbarEntry() {
-        val callback = "com.sup.android.module.publish.view.NewInputCommentDialog\$tryPublish\$2".findClass(cl)
-        val dialogClass = callback.declaredFields.first { Dialog::class.java.isAssignableFrom(it.type) }.type
-        dialogClass.hookAfterMethod("onCreate", Bundle::class.java) { param ->
-            val dialog = param.thisObject as Dialog
-            dialog.window?.decorView?.post { runCatching { attachToolbarButton(dialog) }.onFailure(Log::e) }
-        }
-    }
-
-    private fun attachToolbarButton(dialog: Dialog) {
-        val root = dialog.window?.decorView as? FrameLayout ?: return
-        if (root.findViewWithTag<View>("ppx_custom_emoticon") != null) return
-        val ids = "com.sup.android.module.publish.R\$id".findClass(cl)
-        val gif = root.findViewById<View>(ids.getStaticObjectFieldAs<Int>("iv_comment_gif")) ?: return
-        val density = dialog.context.resources.displayMetrics.density
-        val button = TextView(dialog.context).apply {
-            tag = "ppx_custom_emoticon"
-            text = "皮"
-            textSize = 16f
-            gravity = Gravity.CENTER
-            contentDescription = "自定义表情"
-            setTextColor(Color.WHITE)
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                colors = intArrayOf(0xFFED6559.toInt(), 0xFFFF9E58.toInt())
-                orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
-            }
-            elevation = dp(dialog.context, 3).toFloat()
-            isClickable = true; isFocusable = true
-            setOnClickListener { showGroupsDialog(dialog.context) }
-        }
-        root.addView(button, FrameLayout.LayoutParams(dp(dialog.context, 36), dp(dialog.context, 36)))
-        root.viewTreeObserver.addOnGlobalLayoutListener {
-            button.visibility = if (gif.isShown) View.VISIBLE else View.GONE
-            val origin = IntArray(2); val anchor = IntArray(2)
-            root.getLocationInWindow(origin); gif.getLocationInWindow(anchor)
-            button.x = (anchor[0] - origin[0] + gif.width + dp(dialog.context, 12) + dp(dialog.context, 36) + dp(dialog.context, 8))
-                .coerceAtMost(root.width - button.width - dp(dialog.context, 12)).toFloat()
-            button.y = (anchor[1] - origin[1] + (gif.height - button.height) / 2).toFloat()
+        CommentToolbar.onCreate { dialog ->
+            CommentToolbar.attach(dialog, "ppx_custom_emoticon", CommentToolbar.Icon.IMAGES, 1,
+                "自定义表情") { showGroupsDialog(dialog.context) }
         }
     }
 
@@ -207,37 +176,44 @@ class CustomEmoticonHook : BaseHook {
 
     private fun showCellSaveDialog(context: Context, localPath: String) {
         val service = emojiService() ?: return
-        val models = emoticonModels(service)
-        val model = models.firstOrNull { it.path == localPath }
-        val items = mutableListOf("收藏到默认表情")
-        if (!model?.uri.isNullOrBlank()) items += "加入自定义分组"
-        AlertDialog.Builder(context)
-            .setTitle("保存表情")
-            .setItems(items.toTypedArray()) { dialog, which ->
-                when (items[which]) {
-                    "收藏到默认表情" -> {
-                        if (model != null) toast(context, "已在默认表情中")
-                        else collectLocal(service, context, localPath)
-                    }
-                    "加入自定义分组" -> showGroupPicker(context) { group ->
-                        val uri = model?.uri.orEmpty()
-                        if (uri.isBlank()) {
-                            toast(context, "该表情没有来源链接，暂不支持加入分组")
-                            return@showGroupPicker
+        val model = emoticonModels(service).firstOrNull { it.path == localPath }
+        val uri = model?.uri
+        val sheet = showSheet(context, "保存表情", "选择保存到默认表情或自定义分组")
+        val savedToDefault = model != null
+        sheet.body.addView(sheetRow(
+            context,
+            if (savedToDefault) "默认表情（已收藏）" else "收藏到默认表情",
+            if (savedToDefault) "该表情已在默认表情中" else "保存到官方表情面板",
+            accent = !savedToDefault
+        ) {
+            sheet.dismiss()
+            if (!savedToDefault) collectLocal(service, context, localPath)
+        })
+        if (!uri.isNullOrBlank()) {
+            val w = model.width.takeIf { it > 0 } ?: decodeBounds(localPath).first
+            val h = model.height.takeIf { it > 0 } ?: decodeBounds(localPath).second
+            sheet.body.addView(sheetRow(context, "加入自定义分组", "同时保存到自定义分组") {
+                sheet.dismiss()
+                showGroupPicker(context) { group ->
+                    val cached = StoragePaths.cacheEmoticon(localPath, uri)
+                    val gif = model.gif || localPath.lowercase().endsWith(".gif")
+                    val added = EmoticonGroups.addEmoji(
+                        group, CustomEmoticon(uri, w, h, gif, cached ?: localPath)
+                    )
+                    val persisted = EmoticonGroups.isPersisted(group, uri)
+                    toast(
+                        context,
+                        when {
+                            !persisted -> "保存失败，分组未写入"
+                            added -> "已加入分组「$group」"
+                            else -> "分组中已存在"
                         }
-                        val w = model?.width ?: decodeBounds(localPath).first
-                        val h = model?.height ?: decodeBounds(localPath).second
-                        val added = EmoticonGroups.addEmoji(
-                            group,
-                            CustomEmoticon(uri, w, h, model?.gif ?: false)
-                        )
-                        toast(context, if (added) "已加入分组「$group」" else "分组中已存在")
-                    }
+                    )
+                    if (!savedToDefault) collectLocal(service, context, localPath)
                 }
-                dialog.dismiss()
-            }
-            .setNegativeButton("取消", null)
-            .show()
+            })
+        }
+        sheet.body.addView(sheetRow(context, "取消", null) { sheet.dismiss() })
     }
 
     // mirrors EmoticonModel field access through one holder
@@ -255,7 +231,8 @@ class CustomEmoticonHook : BaseHook {
                         width = (item.callMethodOrNull("getWidth") as? Number)?.toInt() ?: 0,
                         height = (item.callMethodOrNull("getHeight") as? Number)?.toInt() ?: 0,
                         gif = (item.callMethodOrNull("getIsGif") as? Boolean)
-                            ?: (item.callMethodOrNull("isGif") as? Boolean) ?: false
+                            ?: (item.callMethodOrNull("isGif") as? Boolean)
+                            ?: path.lowercase().endsWith(".gif")
                     )
                 }
             }.onFailure(Log::e)
@@ -297,6 +274,134 @@ class CustomEmoticonHook : BaseHook {
 
     // region group browser
 
+    /**
+     * Tapping a saved emoticon shows it enlarged with send/cancel actions and
+     * lets the user swipe through the rest of the group before inserting.
+     */
+    private fun showEmojiPreview(context: Context, emojis: List<CustomEmoticon>, startIndex: Int) {
+        if (emojis.isEmpty()) return
+        val density = context.resources.displayMetrics.density
+        fun dp(v: Int) = (v * density + 0.5f).toInt()
+        val metrics = context.resources.displayMetrics
+        val maxSide = minOf((metrics.widthPixels * 0.72f).toInt(), dp(320))
+        var index = startIndex.coerceIn(0, emojis.lastIndex)
+
+        val dialog = Dialog(context)
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(18), dp(20), dp(18), dp(14))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat(); setColor(Color.WHITE)
+            }
+        }
+        val image = emojiView(context)
+        // Fixed square stage: switching between portrait/landscape entries used
+        // to resize the dialog and shift the buttons under the user's finger.
+        val stage = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(maxSide, maxSide)
+        }
+        stage.addView(image, FrameLayout.LayoutParams(maxSide, maxSide, Gravity.CENTER))
+        container.addView(stage)
+        val position = TextView(context).apply {
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF9A9A9A.toInt())
+            setPadding(0, dp(8), 0, 0)
+        }
+        container.addView(position)
+        val actions = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(18), 0, 0)
+        }
+        fun button(label: String, filled: Boolean, block: () -> Unit) = TextView(context).apply {
+            text = label
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(11), 0, dp(11))
+            if (filled) {
+                setTextColor(Color.WHITE)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = dp(20).toFloat(); setColor(0xFFED6559.toInt())
+                }
+            } else {
+                setTextColor(0xFF666666.toInt())
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = dp(20).toFloat(); setColor(0xFFF2F2F2.toInt())
+                }
+            }
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { block() }
+        }
+        // Declared up-front so the nav buttons can close over the rebind function.
+        lateinit var show: (Int) -> Unit
+        val prev = button("‹", false) { show(index - 1) }
+        val next = button("›", false) { show(index + 1) }
+        prev.layoutParams = LinearLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.WRAP_CONTENT)
+        next.layoutParams = LinearLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.WRAP_CONTENT)
+        prev.textSize = 20f
+        next.textSize = 20f
+        actions.addView(prev)
+        actions.addView(button("发送", true) {
+            dialog.dismiss()
+            insertEmoticon(context, emojis[index])
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            leftMargin = dp(8); rightMargin = dp(8)
+        })
+        actions.addView(next)
+        container.addView(actions)
+        container.addView(TextView(context).apply {
+            text = "取消"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF9A9A9A.toInt())
+            setPadding(0, dp(14), 0, 0)
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        /** Re-binds the enlarged view; GIF entries keep animating on switch. */
+        show = { target ->
+            index = target.coerceIn(0, emojis.lastIndex)
+            val emoji = emojis[index]
+            val ratio = if (emoji.w > 0 && emoji.h > 0) emoji.w.toFloat() / emoji.h else 1f
+            // The image keeps its own aspect ratio inside the fixed stage.
+            val width = (if (ratio >= 1f) maxSide else (maxSide * ratio).toInt()).coerceAtLeast(dp(80))
+            val height = (if (ratio >= 1f) (maxSide / ratio).toInt() else maxSide).coerceAtLeast(dp(80))
+            image.layoutParams = FrameLayout.LayoutParams(width, height, Gravity.CENTER)
+            loadEmojiImage(image, emoji, maxSide)
+            position.text = if (emojis.size > 1) "${index + 1} / ${emojis.size}" else ""
+            prev.alpha = if (index > 0) 1f else 0.35f
+            next.alpha = if (index < emojis.lastIndex) 1f else 0.35f
+        }
+        show(index)
+
+        // Horizontal fling over the picture also switches, matching galleries.
+        image.setOnTouchListener(object : android.view.View.OnTouchListener {
+            private var downX = 0f
+            override fun onTouch(view: View, event: android.view.MotionEvent): Boolean {
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> downX = event.rawX
+                    android.view.MotionEvent.ACTION_UP -> {
+                        val dx = event.rawX - downX
+                        if (dx > dp(48) && index > 0) show(index - 1)
+                        else if (dx < -dp(48) && index < emojis.lastIndex) show(index + 1)
+                    }
+                }
+                return true
+            }
+        })
+
+        dialog.setContentView(container)
+        dialog.window?.apply {
+            setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setBackgroundDrawableResource(android.R.color.transparent)
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0.5f)
+        }
+        dialog.show()
+    }
+
     private fun showGroupsDialog(context: Context) {
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
             .hideSoftInputFromWindow((context as? Activity)?.window?.decorView?.windowToken, 0)
@@ -304,65 +409,73 @@ class CustomEmoticonHook : BaseHook {
         fun dp(v: Int) = (v * density + 0.5f).toInt()
         val accent = 0xFFED6559.toInt()
 
-        var chips: LinearLayout? = null
-        var grid: GridLayout? = null
+        lateinit var render: () -> Unit
         var selected: String? = EmoticonGroups.load().firstOrNull()?.name
+        val sheet = showSheet(
+            context,
+            "自定义表情",
+            "长按分组可管理 · 长按表情可移动或移出",
+            listOf("导入" to { importDialog(context) { render() } }, "导出" to { exportToClipboard(context) }),
+            expanded = true
+        )
+
+        var chips: LinearLayout? = null
+        var grid: GridView? = null
+        val empty = TextView(context).apply {
+            textSize = 13f; setTextColor(0xFF9A9A9A.toInt()); gravity = Gravity.CENTER
+        }
 
         fun renderGrid(groupName: String?) {
-            val grid = grid ?: return
-            val group = groupName ?: run {
-                grid.removeAllViews()
-                grid.addView(TextView(context).apply {
-                    text = "还没有分组，点上方「＋ 添加分组」创建"
-                    setTextColor(0xFF999999.toInt()); gravity = Gravity.CENTER
-                    setPadding(0, dp(48), 0, dp(48))
-                }, GridLayout.LayoutParams().apply { width = GridLayout.LayoutParams.MATCH_PARENT })
-                return
+            val target = grid ?: return
+            val groups = EmoticonGroups.load()
+            val group = groups.firstOrNull { it.name == groupName }
+            empty.text = if (group == null) "还没有分组，点上方「＋ 添加分组」创建"
+                else "分组还是空的，可导入收藏或长按表情加入"
+            val emojis = group?.emojis?.toList().orEmpty()
+            target.setOnItemClickListener { _, _, position, _ ->
+                showEmojiPreview(context, emojis, position)
             }
-            grid.removeAllViews()
-            val emojis = EmoticonGroups.load().firstOrNull { it.name == group }?.emojis ?: return
-            emojis.forEach { emoji ->
-                val cell = FrameLayout(context).apply { setPadding(dp(5), dp(5), dp(5), dp(5)) }
-                val view = "com.facebook.drawee.view.SimpleDraweeView".findClass(cl).new(context) as View
-                view.layoutParams = FrameLayout.LayoutParams(dp(80), dp(80))
-                view.background = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(0x0D000000); cornerRadius = dp(12).toFloat()
-                }
-                runCatching {
-                    "com.bytedance.ies.xelement.video.base.utils.FrescoHelper".findClass(cl)
-                        .callStaticMethod("bindImage", view, emoji.uri, 0, 0, Bitmap.Config.RGB_565)
-                }.onFailure {
-                    view.callMethod("setImageURI", Uri.parse(emoji.uri))
-                }
-                view.setOnClickListener { insertEmoticon(context, emoji) }
-                view.setOnLongClickListener {
-                    AlertDialog.Builder(context)
-                        .setTitle("从分组移除")
-                        .setMessage("将该表情移出「$group」？")
-                        .setPositiveButton("移除") { d, _ ->
-                            EmoticonGroups.removeEmoji(group, emoji.uri)
-                            renderGrid(group); d.dismiss()
-                        }
-                        .setNegativeButton("取消", null).show()
-                    true
-                }
-                cell.addView(view)
-                grid.addView(cell)
+            target.setOnItemLongClickListener { _, _, position, _ ->
+                val name = group?.name ?: return@setOnItemLongClickListener false
+                val emoji = emojis.getOrNull(position) ?: return@setOnItemLongClickListener false
+                val menu = showSheet(context, "管理表情", "当前分组：$name")
+                menu.body.addView(sheetRow(context, "移动到其他分组", "选择目标分组，也可以新建分组", accent = true) {
+                    menu.dismiss()
+                    showGroupPicker(context, movingFrom = name) { destination ->
+                        if (EmoticonGroups.moveEmoji(name, destination, emoji.uri)) {
+                            toast(context, "已移动到「$destination」")
+                            selected = destination
+                            render()
+                        } else toast(context, "移动失败，表情或目标分组不可用，请检查存储目录")
+                    }
+                })
+                menu.body.addView(sheetRow(context, "移出当前分组", "仅从「$name」中移出这张表情") {
+                    EmoticonGroups.removeEmoji(name, emoji.uri)
+                    menu.dismiss()
+                    val groupsNow = EmoticonGroups.load()
+                    selected = groupsNow.firstOrNull { it.name == name }?.name
+                        ?: groupsNow.firstOrNull()?.name
+                    render()
+                })
+                menu.body.addView(sheetRow(context, "取消", null) { menu.dismiss() })
+                true
             }
-            if (emojis.isEmpty()) {
-                grid.addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-                    setPadding(0, dp(48), 0, dp(48))
-                    addView(TextView(context).apply {
-                        text = "皮"; textSize = 40f; gravity = Gravity.CENTER
-                        setTextColor(0x22000000.toInt())
-                    })
-                    addView(TextView(context).apply {
-                        text = "分组还是空的，长按表情面板里的表情加入"
-                        setTextColor(0xFF999999.toInt()); setPadding(0, dp(12), 0, 0)
-                    })
-                }, GridLayout.LayoutParams().apply { width = GridLayout.LayoutParams.MATCH_PARENT })
+            // The native GridView recycles cells, so importing hundreds of favorites
+            // does not decode every image or start every GIF at once.
+            target.adapter = object : BaseAdapter() {
+                override fun getCount() = emojis.size
+                override fun getItem(position: Int) = emojis[position]
+                override fun getItemId(position: Int) = position.toLong()
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val emoji = emojis[position]
+                    // GridView measures position 0 using a temporarily detached scrap
+                    // cell. Keep its children intact and let the grid dispatch item clicks.
+                    val cell = convertView as? EmoticonCell ?: EmoticonCell(context)
+                    cell.bind(emoji, position)
+                    return cell
+                }
             }
+            target.setSelection(0)
         }
 
         fun renderChips(active: String?) {
@@ -371,179 +484,437 @@ class CustomEmoticonHook : BaseHook {
             fun chip(label: String, filled: Boolean, onClick: () -> Unit, onLong: (() -> Unit)? = null) {
                 row.addView(TextView(context).apply {
                     text = label
-                    setPadding(dp(18), dp(9), dp(18), dp(9))
+                    textSize = 13f
+                    setPadding(dp(16), dp(9), dp(16), dp(9))
                     gravity = Gravity.CENTER
                     if (filled) {
                         setTextColor(Color.WHITE)
                         background = android.graphics.drawable.GradientDrawable().apply {
-                            cornerRadius = dp(20).toFloat(); setColor(accent)
+                            cornerRadius = dp(18).toFloat(); setColor(accent)
                         }
                     } else {
-                        setTextColor(0xFF444444.toInt())
+                        setTextColor(0xFF4A4A4A.toInt())
                         background = android.graphics.drawable.GradientDrawable().apply {
-                            cornerRadius = dp(20).toFloat(); setColor(0x0F000000)
+                            cornerRadius = dp(18).toFloat(); setColor(0xFFF2F2F2.toInt())
                         }
                     }
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { rightMargin = dp(8) }
                     setOnClickListener { onClick() }
                     onLong?.let { listener -> setOnLongClickListener { listener(); true } }
                 })
             }
             EmoticonGroups.load().forEach { group ->
-                val activeGroup = group.name == active
-                chip("${group.name} ${group.emojis.size}", activeGroup, {
-                    selected = group.name; renderChips(selected); renderGrid(selected)
+                chip("${group.name} · ${group.emojis.size}", group.name == active, {
+                    selected = group.name; render()
                 }, {
-                    AlertDialog.Builder(context)
-                        .setTitle("分组：${group.name}")
-                        .setItems(arrayOf("重命名", "删除分组")) { d, which ->
-                            when (which) {
-                                0 -> renameDialog(context, group.name) { newName ->
-                                    EmoticonGroups.renameGroup(group.name, newName)
-                                    selected = newName; renderChips(selected); renderGrid(selected)
-                                }
-                                1 -> {
-                                    EmoticonGroups.deleteGroup(group.name)
-                                    selected = EmoticonGroups.load().firstOrNull()?.name
-                                    renderChips(selected); renderGrid(selected)
-                                }
-                            }
-                            d.dismiss()
+                    val menu = showSheet(context, "分组：${group.name}", "选择要执行的操作")
+                    menu.body.addView(sheetRow(context, "重命名分组", "修改分组名称") {
+                        menu.dismiss()
+                        renameDialog(context, group.name) { newName ->
+                            EmoticonGroups.renameGroup(group.name, newName)
+                            selected = newName; render()
                         }
-                        .setNegativeButton("取消", null).show()
+                    })
+                    menu.body.addView(sheetRow(context, "删除分组", "同时删除组内 ${group.emojis.size} 张表情", accent = true) {
+                        EmoticonGroups.deleteGroup(group.name)
+                        selected = EmoticonGroups.load().firstOrNull()?.name
+                        menu.dismiss(); render()
+                    })
+                    menu.body.addView(sheetRow(context, "取消", null) { menu.dismiss() })
                 })
             }
-            chip("＋ 添加分组", true, {
+            chip("＋ 添加分组", false, {
                 renameDialog(context, null) { name ->
                     EmoticonGroups.createGroup(name)
-                    selected = name; renderChips(selected); renderGrid(selected)
+                    selected = name; render()
                 }
             })
         }
 
-        val root = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadii = floatArrayOf(dp(22).toFloat(), dp(22).toFloat(), dp(22).toFloat(), dp(22).toFloat(), 0f, 0f, 0f, 0f)
-                setColor(Color.WHITE)
-            }
-            setPadding(dp(20), dp(10), dp(20), dp(24))
-        }
-        root.addView(View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(4)).apply { gravity = Gravity.CENTER_HORIZONTAL }
-            background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(2).toFloat(); setColor(0x33000000)
-            }
-        })
-        val titleRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(14), 0, dp(4))
-            addView(TextView(context).apply {
-                text = "自定义表情"; textSize = 18f
-                setTextColor(0xFF222222.toInt())
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            })
-        }
-        titleRow.addView(TextView(context).apply {
-            text = "导入"; textSize = 14f
-            setTextColor(accent); setPadding(dp(12), dp(6), dp(12), dp(6))
-            setOnClickListener { importDialog(context) { renderChips(selected); renderGrid(selected) } }
-        })
-        titleRow.addView(TextView(context).apply {
-            text = "导出"; textSize = 14f
-            setTextColor(accent); setPadding(dp(12), dp(6), dp(12), dp(6))
-            setOnClickListener {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("皮友助手自定义表情", EmoticonGroups.export()))
-                Toast.makeText(context, "分组 JSON 已复制到剪贴板", Toast.LENGTH_SHORT).show()
-            }
-        })
-        root.addView(titleRow)
-        chips = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10), 0, dp(4))
-        }
-        root.addView(HorizontalScrollView(context).apply {
-            addView(chips); scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
-        })
-        grid = GridLayout(context).apply { columnCount = 4 }
-        root.addView(ScrollView(context).apply {
-            addView(grid)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(400)
-            ).apply { topMargin = dp(6) }
-        })
+        render = { renderChips(selected); renderGrid(selected) }
 
-        val dialog = Dialog(context)
-        dialog.setContentView(root)
-        dialog.window?.apply {
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, dp(620))
-            setGravity(Gravity.BOTTOM)
-            setBackgroundDrawableResource(android.R.color.transparent)
-        }
-        dialog.show()
-        renderChips(selected)
-        renderGrid(selected)
-    }
-
-    /** Centered rounded-card dialog matching the group browser style. */
-    private fun cardDialog(context: Context, title: String, content: View, positive: String, onPositive: () -> Unit) {
-        val density = context.resources.displayMetrics.density
-        fun dp(v: Int) = (v * density + 0.5f).toInt()
-        val dialog = Dialog(context)
-        val root = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(14))
-            background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(20).toFloat(); setColor(Color.WHITE)
-            }
-        }
-        root.addView(TextView(context).apply {
-            text = title; textSize = 16f
-            setTextColor(0xFF222222.toInt())
-        })
-        root.addView(content, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { setMargins(0, dp(14), 0, dp(6)) })
-        root.addView(LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END
-            fun action(label: String, filled: Boolean, block: () -> Unit) {
+        sheet.body.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            fun action(label: String, block: () -> Unit) {
                 addView(TextView(context).apply {
-                    text = label
-                    setPadding(dp(18), dp(8), dp(18), dp(8))
-                    gravity = Gravity.CENTER
-                    if (filled) {
-                        setTextColor(Color.WHITE)
-                        background = android.graphics.drawable.GradientDrawable().apply {
-                            cornerRadius = dp(18).toFloat(); setColor(0xFFED6559.toInt())
-                        }
-                    } else {
-                        setTextColor(0xFF666666.toInt())
-                        background = android.graphics.drawable.GradientDrawable().apply {
-                            cornerRadius = dp(18).toFloat(); setColor(0x14000000)
-                        }
+                    text = label; textSize = 13f; gravity = Gravity.CENTER
+                    setTextColor(accent)
+                    setPadding(dp(8), dp(12), dp(8), dp(12))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat(); setColor(0x14ED6559)
                     }
                     setOnClickListener { block() }
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(dp(3), 0, dp(3), dp(12))
                 })
             }
-            action("取消", false) { dialog.dismiss() }
-            action(positive, true) {
-                dialog.dismiss()
-                onPositive()
+            action("导入全部收藏") {
+                importFavorites(context) {
+                    if (sheet.dialog.isShowing) {
+                        selected = EmoticonGroups.load().firstOrNull { it.name == "收藏表情" }?.name ?: selected
+                        render()
+                    }
+                }
             }
-        }, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
-        dialog.setContentView(FrameLayout(context).apply {
-            setBackgroundColor(0x66000000)
-            addView(root, FrameLayout.LayoutParams(
-                context.resources.displayMetrics.widthPixels - dp(48),
-                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER
-            ))
+            action("全部删除表情") {
+                confirmClearEmojis(context) { if (sheet.dialog.isShowing) render() }
+            }
         })
-        dialog.window?.apply {
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            setBackgroundDrawableResource(android.R.color.transparent)
+        chips = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        sheet.body.addView(HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(chips)
+        })
+        grid = GridView(context).apply {
+            numColumns = 4
+            horizontalSpacing = dp(4); verticalSpacing = dp(4)
+            stretchMode = GridView.STRETCH_COLUMN_WIDTH
+            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            isVerticalScrollBarEnabled = false
+            emptyView = empty
         }
+        sheet.body.addView(FrameLayout(context).apply {
+            addView(grid)
+            addView(empty, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            ).apply { topMargin = dp(10) }
+        })
+        render()
+    }
+
+    private inner class EmoticonCell(context: Context) : FrameLayout(context) {
+        private val image = emojiView(context)
+        private val badge = TextView(context).apply {
+            text = "GIF"; textSize = 8.5f; gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(context, 5).toFloat(); setColor(0xCCED6559.toInt())
+            }
+        }
+        private var bound: CustomEmoticon? = null
+
+        init {
+            layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 84))
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(context, 14).toFloat(); setColor(0xFFF7F7F7.toInt())
+            }
+            addView(image, FrameLayout.LayoutParams(dp(context, 76), dp(context, 76), Gravity.CENTER))
+            addView(badge, FrameLayout.LayoutParams(
+                dp(context, 26), dp(context, 14), Gravity.TOP or Gravity.END
+            ).apply { topMargin = dp(context, 4); rightMargin = dp(context, 4) })
+        }
+
+        fun bind(emoji: CustomEmoticon, position: Int) {
+            contentDescription = "表情 ${position + 1}"
+            if (bound != emoji) {
+                (image as? android.widget.ImageView)?.let {
+                    (it.drawable as? android.graphics.drawable.Animatable)?.stop()
+                    it.setImageDrawable(null)
+                }
+                loadEmojiImage(image, emoji, dp(context, 76))
+                bound = emoji
+            }
+            badge.visibility = if (emoji.gif || emoji.local?.lowercase()?.endsWith(".gif") == true)
+                View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun confirmClearEmojis(context: Context, onDone: () -> Unit) {
+        if (importingFavorites.get()) {
+            toast(context, "正在导入收藏，请稍后再试")
+            return
+        }
+        val count = EmoticonGroups.load().sumOf { it.emojis.size }
+        if (count == 0) {
+            toast(context, "暂无可删除的自定义表情")
+            return
+        }
+        val message = TextView(context).apply {
+            text = "将删除所有分组中的 $count 张自定义表情，保留分组名称。\n\n官方收藏不受影响。删除后可通过之前导出的 JSON 恢复。"
+            textSize = 14f; setTextColor(0xFF666666.toInt())
+        }
+        cardDialog(context, "删除全部自定义表情？", message, "全部删除") {
+            if (EmoticonGroups.clearEmojis()) {
+                toast(context, "已删除 $count 张自定义表情")
+                onDone()
+            } else toast(context, "删除失败，请检查存储目录")
+        }
+    }
+
+    private fun importFavorites(context: Context, onDone: () -> Unit) {
+        if (!importingFavorites.compareAndSet(false, true)) {
+            toast(context, "正在导入收藏，请稍后再试")
+            return
+        }
+        val service = runCatching { emojiService() }.onFailure(Log::e).getOrNull()
+        if (service == null) {
+            importingFavorites.set(false)
+            toast(context, "表情服务未就绪，请稍后再试")
+            return
+        }
+        val dialog = Dialog(context)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val status = TextView(context).apply {
+            text = "正在读取收藏表情…"; textSize = 14f; setTextColor(0xFF666666.toInt())
+            setPadding(0, dp(context, 16), 0, dp(context, 12))
+        }
+        val progress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFFED6559.toInt())
+        }
+        val close = TextView(context).apply {
+            text = "正在导入…"; textSize = 14f; gravity = Gravity.END
+            setTextColor(0xFFED6559.toInt()); setPadding(0, dp(context, 18), 0, 0)
+            isEnabled = false
+            setOnClickListener { dialog.dismiss() }
+        }
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(context, 24), dp(context, 22), dp(context, 24), dp(context, 20))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(context, 20).toFloat(); setColor(Color.WHITE)
+            }
+            addView(TextView(context).apply {
+                text = "导入全部收藏"; textSize = 18f; setTextColor(0xFF1F1F1F.toInt())
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            })
+            addView(status)
+            addView(progress, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 8)))
+            addView(close)
+        }
+        dialog.setContentView(content)
+        dialog.setCancelable(false)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
+        dialog.window?.setLayout(context.resources.displayMetrics.widthPixels - dp(context, 48), ViewGroup.LayoutParams.WRAP_CONTENT)
+        Thread({
+            val result = runCatching {
+                val models = (service.callMethod("getEmojiListByType", 2) as? List<*>)?.toList()
+                    ?: error("收藏列表读取失败")
+                val emojis = ArrayList<CustomEmoticon>(models.size)
+                var skipped = 0
+                var lastPercent = -1
+                models.forEachIndexed { index, item ->
+                    val emoji = runCatching { item?.let(::favoriteEmoticon) }.onFailure(Log::e).getOrNull()
+                    if (emoji == null) skipped++ else emojis.add(emoji)
+                    val done = index + 1
+                    val percent = (done.toLong() * 100 / models.size).toInt()
+                    if (percent != lastPercent || done == models.size) {
+                        lastPercent = percent
+                        main.post {
+                            progress.isIndeterminate = false
+                            progress.progress = percent
+                            status.text = "正在导入 $done / ${models.size}（$percent%）"
+                        }
+                    }
+                }
+                main.post { status.text = "正在保存分组…" }
+                val added = EmoticonGroups.addEmojis("收藏表情", emojis)
+                check(added >= 0) { "分组保存失败，请检查存储目录" }
+                Log.i("CustomEmoticon favorites import total=${models.size} added=$added skipped=$skipped")
+                when {
+                    models.isEmpty() -> "暂无已收藏的表情"
+                    else -> "导入完成，新增 $added 张，已有 ${emojis.size - added} 张" +
+                        if (skipped > 0) "，无法读取 $skipped 张" else ""
+                }
+            }.onFailure(Log::e)
+            main.post {
+                importingFavorites.set(false)
+                val activity = context as? Activity
+                if (activity?.isFinishing == true || activity?.isDestroyed == true) return@post
+                progress.isIndeterminate = false
+                progress.progress = if (result.isSuccess) 100 else progress.progress
+                status.text = result.getOrElse { "导入失败：${it.message ?: "请稍后重试"}" }
+                close.text = "完成"; close.isEnabled = true
+                dialog.setCancelable(true)
+                if (result.isSuccess) onDone()
+            }
+        }, "ppx-import-favorites").start()
+    }
+
+    /** Convert official favorites without invoking collection/download APIs again. */
+    private fun favoriteEmoticon(model: Any): CustomEmoticon? {
+        val rawPath = model.callMethodOrNull("getLocalPath") as? String
+        val path = rawPath?.let { if (it.startsWith("file:")) Uri.parse(it).path else it }
+        val uri = imageUri(model).takeIf { it.isNotBlank() }
+            ?: path?.takeIf { java.io.File(it).isFile }?.let(::fileUri)
+            ?: return null
+        return CustomEmoticon(
+            uri = uri,
+            w = (model.callMethodOrNull("getWidth") as? Number)?.toInt() ?: 0,
+            h = (model.callMethodOrNull("getHeight") as? Number)?.toInt() ?: 0,
+            gif = (model.callMethodOrNull("getIsGif") as? Boolean)
+                ?: (model.callMethodOrNull("isGif") as? Boolean)
+                ?: (path?.lowercase()?.endsWith(".gif") == true),
+            local = StoragePaths.cacheEmoticon(path, uri) ?: path
+        )
+    }
+
+    private fun exportToClipboard(context: Context) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("皮友助手自定义表情", EmoticonGroups.export()))
+        Toast.makeText(context, "分组 JSON 已复制到剪贴板", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Finds the on-disk copy for a stored group entry. Saved entries keep the
+     * source uri (for cross-device import), but the host already downloaded the
+     * image, so the local file is preferred: it always renders and works
+     * offline. Matching by file name also covers uris rewritten by the CDN.
+     */
+    private fun localPathFor(emoji: CustomEmoticon): String? {
+        emoji.local?.takeIf { java.io.File(it).isFile }?.let { return it }
+        // Older entries only stored the URI; look for a cached copy in the
+        // shared emoticon folder, then fall back to the host's own download.
+        runCatching {
+            StoragePaths.emoticonDir().listFiles()?.forEach { file ->
+                if (file.isFile && file.name.startsWith(cacheKey(emoji.uri))) return file.absolutePath
+            }
+        }
+        val service = emojiService() ?: return null
+        val target = emoji.uri
+        val targetName = target.substringAfterLast('/').substringBefore('?')
+        val models = runCatching {
+            (service.callMethod("getEmojiListByType", 2) as? List<*>).orEmpty() +
+                (service.callMethod("getEmojiListByType", 4) as? List<*>).orEmpty()
+        }.getOrDefault(emptyList())
+        models.forEach { item ->
+            val path = item?.callMethodOrNull("getLocalPath") as? String ?: return@forEach
+            if (!java.io.File(path).isFile) return@forEach
+            val uri = item.callMethodOrNull("getUri") as? String
+            val name = uri?.substringAfterLast('/')?.substringBefore('?')
+            if (uri == target || (targetName.isNotBlank() && name == targetName)) {
+                StoragePaths.cacheEmoticon(path, target)?.let { return it }
+                return path
+            }
+        }
+        return null
+    }
+
+    private fun cacheKey(uri: String): String = runCatching {
+        val digest = java.security.MessageDigest.getInstance("SHA-1")
+        digest.digest(uri.toByteArray()).joinToString("") { "%02x".format(it) }.take(24)
+    }.getOrDefault(uri.hashCode().toString())
+
+    private fun fileUri(path: String): String =
+        if (path.startsWith("file:")) path else Uri.fromFile(java.io.File(path)).toString()
+
+    /**
+     * Builds the view used inside groups and the preview.
+     *
+     * Animated entries (GIF / animated WebP) cannot go through the host's
+     * Fresco helper: it decodes frame 0 only, and even the controller path left
+     * them frozen on 6.5.5. Android 16 exposes ImageDecoder + AnimatedImageDrawable
+     * for both formats, so those files are rendered natively and stay animated
+     * no matter how the host configured Fresco.
+     */
+    private fun emojiView(context: Context): View =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P)
+            android.widget.ImageView(context).apply {
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(view: View) {
+                        (drawable as? android.graphics.drawable.Animatable)?.start()
+                    }
+                    override fun onViewDetachedFromWindow(view: View) {
+                        (drawable as? android.graphics.drawable.Animatable)?.stop()
+                    }
+                })
+            }
+        else "com.facebook.drawee.view.SimpleDraweeView".findClass(cl).new(context) as View
+
+    /**
+     * Renders a local emoticon file into [view], starting the frame animation
+     * when the bytes are animated. Returns false when the file cannot be read,
+     * so the caller can fall back to the host's Fresco loader.
+     *
+     * Android 16 can decode GIF and animated WebP through ImageDecoder, while
+     * the host's Fresco helper only ever produced frame 0 for our saved files.
+     */
+    private fun loadNativeImage(view: View, path: String, size: Int): Boolean = runCatching {
+        val image = view as? android.widget.ImageView ?: return false
+        val file = java.io.File(path)
+        if (!file.isFile || file.length() == 0L) return false
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val uri = Uri.fromFile(file)
+            val source = android.graphics.ImageDecoder.createSource(view.context.contentResolver, uri)
+            val drawable = android.graphics.ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                val longest = maxOf(info.size.width, info.size.height)
+                if (longest > size) decoder.setTargetSize(
+                    (info.size.width.toLong() * size / longest).toInt().coerceAtLeast(1),
+                    (info.size.height.toLong() * size / longest).toInt().coerceAtLeast(1)
+                )
+            }
+            image.setImageDrawable(drawable)
+            (drawable as? android.graphics.drawable.Animatable)?.let {
+                it.start()
+                Log.i("CustomEmoticon image native-anim file=${file.name}")
+            }
+            return true
+        }
+        val bitmap = android.graphics.BitmapFactory.decodeFile(path) ?: return false
+        image.setImageBitmap(bitmap)
+        true
+    }.onFailure { Log.e(it) }.getOrDefault(false)
+
+    /** Loads an emoticon: local copy rendered natively, remote falls back to Fresco. */
+    private fun loadEmojiImage(view: View, emoji: CustomEmoticon, size: Int) {
+        val local = localPathFor(emoji)
+        if (local != null && loadNativeImage(view, local, size)) return
+        val source = local?.let(::fileUri) ?: normalizeRemote(emoji.uri)
+        if (source.isBlank()) {
+            Log.i("CustomEmoticon skip blank uri")
+            return
+        }
+        // No readable local file (remote-only entry): the host helper needs a
+        // SimpleDraweeView, so only this branch still depends on Fresco.
+        val animated = emoji.gif ||
+            local?.lowercase()?.endsWith(".gif") == true ||
+            source.substringBefore('?').lowercase().endsWith(".gif")
+        if (!animated) {
+            val loaded = runCatching {
+                val drawee = "com.facebook.drawee.view.SimpleDraweeView".findClass(cl)
+                if (!drawee.isInstance(view)) return@runCatching false
+                "com.bytedance.ies.xelement.video.base.utils.FrescoHelper".findClass(cl)
+                    .callStaticMethod(
+                        "bindImage", view, source, size, size, android.graphics.Bitmap.Config.ARGB_8888
+                    )
+                true
+            }.onFailure(Log::e).getOrDefault(false)
+            if (loaded) {
+                Log.i("CustomEmoticon image source=${source.take(72)} local=false")
+                return
+            }
+        }
+        runCatching {
+            require(view !is android.widget.ImageView) { "ImageView has no Fresco controller" }
+            val requestBuilder = "com.facebook.imagepipeline.request.ImageRequestBuilder".findClass(cl)
+                .callStaticMethod("newBuilderWithSource", Uri.parse(source))
+            val request = requestBuilder.callMethod("build")
+            val controllerBuilder = "com.facebook.drawee.backends.pipeline.Fresco".findClass(cl)
+                .callStaticMethod("newDraweeControllerBuilder")
+            controllerBuilder.callMethod("setImageRequest", request)
+            runCatching {
+                controllerBuilder.callMethod("setOldController", view.callMethod("getController"))
+            }.onFailure(Log::e)
+            if (animated) controllerBuilder.callMethod("setAutoPlayAnimations", true)
+            view.callMethod("setController", controllerBuilder.callMethod("build"))
+            Log.i("CustomEmoticon image fresco source=${source.take(72)} animated=$animated")
+        }.onFailure(Log::e)
+    }
+
+    /** Bare CDN keys have no scheme; the host's CDN expects the ppx host. */
+    private fun normalizeRemote(uri: String): String = when {
+        uri.isBlank() -> ""
+        uri.startsWith("http://") || uri.startsWith("https://") || uri.startsWith("file:") -> uri
+        uri.startsWith("//") -> "https:$uri"
+        uri.startsWith("/") -> fileUri(uri)
+        else -> "https://p1-ppx.bytecdn.cn/$uri"
     }
 
     private fun renameDialog(context: Context, current: String?, onDone: (String) -> Unit) {
@@ -553,7 +924,7 @@ class CustomEmoticonHook : BaseHook {
             setText(current); hint = "输入分组名称"
             setTextColor(0xFF222222.toInt()); setHintTextColor(0xFF999999.toInt())
             background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat(); setColor(0x0F000000)
+                cornerRadius = dp(12).toFloat(); setColor(0xFFF5F5F5.toInt())
             }
             setPadding(dp(14), dp(12), dp(14), dp(12))
         }
@@ -570,7 +941,7 @@ class CustomEmoticonHook : BaseHook {
             hint = "粘贴导出的分组 JSON"
             setTextColor(0xFF222222.toInt()); setHintTextColor(0xFF999999.toInt())
             background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat(); setColor(0x0F000000)
+                cornerRadius = dp(12).toFloat(); setColor(0xFFF5F5F5.toInt())
             }
             setPadding(dp(14), dp(12), dp(14), dp(12))
             minHeight = dp(120); gravity = Gravity.TOP
@@ -582,24 +953,27 @@ class CustomEmoticonHook : BaseHook {
         }
     }
 
-    private fun showGroupPicker(context: Context, onPick: (String) -> Unit) {
-        val groups = EmoticonGroups.load()
-        val names = groups.map { it.name }.toMutableList().apply { add("＋ 新建分组") }
-        AlertDialog.Builder(context)
-            .setTitle("加入自定义分组")
-            .setItems(names.toTypedArray()) { d, which ->
-                if (which == names.lastIndex) {
-                    renameDialog(context, null) { name ->
-                        EmoticonGroups.createGroup(name)
-                        onPick(name)
-                    }
-                } else onPick(names[which])
-                d.dismiss()
+    private fun showGroupPicker(context: Context, movingFrom: String? = null, onPick: (String) -> Unit) {
+        val sheet = showSheet(
+            context,
+            if (movingFrom == null) "加入自定义分组" else "移动到分组",
+            if (movingFrom == null) "选择保存位置，表情会同时收藏为默认表情"
+            else "从「$movingFrom」移出，目标分组已有的表情会自动去重"
+        )
+        EmoticonGroups.load().filter { it.name != movingFrom }.forEach { group ->
+            sheet.body.addView(sheetRow(context, group.name, "已有 ${group.emojis.size} 张表情") {
+                sheet.dismiss(); onPick(group.name)
+            })
+        }
+        sheet.body.addView(sheetRow(context, "＋ 新建分组", if (movingFrom == null) "创建后立即保存到该分组" else "创建后立即移动到该分组", accent = true) {
+            sheet.dismiss()
+            renameDialog(context, null) { name ->
+                EmoticonGroups.createGroup(name)
+                onPick(name)
             }
-            .setNegativeButton("取消", null).show()
+        })
+        sheet.body.addView(sheetRow(context, "取消", null) { sheet.dismiss() })
     }
-
-    // endregion
 
     // region insertion
 
@@ -726,45 +1100,68 @@ class CustomEmoticonHook : BaseHook {
     }
 
     private fun showBatchDialog(context: Activity, images: List<Any?>) {
-        AlertDialog.Builder(context)
-            .setTitle("一键收藏表情（${images.size} 张）")
-            .setMessage("将该评论里的全部表情添加到哪里？")
-            .setPositiveButton("添加到官方表情") { d, _ ->
-                val service = emojiService() ?: return@setPositiveButton
-                val success = java.util.concurrent.atomic.AtomicInteger()
-                val total = images.filterNotNull().size
-                val callback = singleCallback(context) { result ->
-                    if (result == 1 || result == 8) {
-                        val done = success.incrementAndGet()
-                        if (done == total) toast(context, "已收藏 $done 张表情")
+        val valid = images.filterNotNull()
+        val sheet = showSheet(
+            context,
+            "一键收藏表情（${valid.size} 张）",
+            "将该评论里的全部表情保存到哪里？"
+        )
+        sheet.body.addView(sheetRow(context, "添加到官方表情", "收藏后可在表情面板直接使用") {
+            sheet.dismiss()
+            val service = emojiService() ?: return@sheetRow
+            val success = java.util.concurrent.atomic.AtomicInteger()
+            val total = valid.size
+            val callback = singleCallback(context) { result ->
+                if (result == 1 || result == 8) {
+                    val done = success.incrementAndGet()
+                    if (done == total) toast(context, "已收藏 $done 张表情")
+                }
+            }
+            valid.forEach { image ->
+                runCatching { service.callMethod("collectEmoticon", image, 0L, 0L, 0L, callback) }
+                    .onFailure(Log::e)
+            }
+        })
+        sheet.body.addView(sheetRow(context, "添加到自定义分组", "可新建分组并自动收藏到默认表情", accent = true) {
+            sheet.dismiss()
+            showGroupPicker(context) { group ->
+                var added = 0
+                val service = emojiService()
+                val callback = service?.let {
+                    singleCallback(context) { }
+                }
+                valid.forEach { image ->
+                    val uri = imageUri(image)
+                    if (uri.isBlank()) return@forEach
+                    val w = (image.callMethodOrNull("getWidth") as? Number)?.toInt() ?: 0
+                    val h = (image.callMethodOrNull("getHeight") as? Number)?.toInt() ?: 0
+                    val rawLocal = (image.callMethodOrNull("getUri") as? String)?.takeIf {
+                        it.startsWith("/") || it.startsWith("file:")
+                    } ?: (image.callMethodOrNull("getLocalPath") as? String)
+                    val local = StoragePaths.cacheEmoticon(rawLocal, uri) ?: rawLocal
+                    val gif = (image.callMethodOrNull("isGif") as? Boolean) == true ||
+                        (image.callMethodOrNull("getIsGif") as? Boolean) == true ||
+                        rawLocal?.lowercase()?.endsWith(".gif") == true
+                    if (EmoticonGroups.addEmoji(group, CustomEmoticon(uri, w, h, gif, local))) added++
+                    if (service != null && callback != null) {
+                        runCatching { service.callMethod("collectEmoticon", image, 0L, 0L, 0L, callback) }
+                            .onFailure(Log::e)
                     }
                 }
-                images.filterNotNull().forEach { image ->
-                    runCatching { service.callMethod("collectEmoticon", image, 0L, 0L, 0L, callback) }
-                        .onFailure { Log.e(it) }
-                }
-                d.dismiss()
+                val persisted = EmoticonGroups.isGroupPersisted(group)
+                toast(
+                    context,
+                    if (persisted) "已加入分组「$group」$added 张" else "保存失败，分组未写入"
+                )
             }
-            .setNegativeButton("添加到自定义分组") { d, _ ->
-                showGroupPicker(context) { group ->
-                    var added = 0
-                    images.filterNotNull().forEach { image ->
-                        val uri = ((image.callMethodOrNull("getUri") as? String)
-                            ?: ((image.callMethodOrNull("getUrlList") as? List<*>)?.firstOrNull()
-                                ?.callMethodOrNull("getUrl") as? String)).orEmpty()
-                        if (uri.isBlank()) return@forEach
-                        val w = (image.callMethodOrNull("getWidth") as? Number)?.toInt() ?: 0
-                        val h = (image.callMethodOrNull("getHeight") as? Number)?.toInt() ?: 0
-                        val gif = (image.callMethodOrNull("isGif") as? Boolean) ?: false
-                        if (EmoticonGroups.addEmoji(group, CustomEmoticon(uri, w, h, gif))) added++
-                    }
-                    toast(context, "已加入分组「$group」$added 张")
-                }
-                d.dismiss()
-            }
-            .setNeutralButton("取消", null)
-            .show()
+        })
+        sheet.body.addView(sheetRow(context, "取消", null) { sheet.dismiss() })
     }
+
+    private fun imageUri(image: Any): String =
+        ((image.callMethodOrNull("getUri") as? String)
+            ?: ((image.callMethodOrNull("getUrlList") as? List<*>)?.firstOrNull()
+                ?.callMethodOrNull("getUrl") as? String)).orEmpty()
 
     private fun interceptBatch(param: com.akari.ppx.utils.HookParam) {
         val context = param.args[0] as Activity

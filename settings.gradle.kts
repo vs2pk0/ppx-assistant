@@ -7,7 +7,7 @@ pluginManagement {
 }
 
 plugins {
-    id("de.fayard.refreshVersions") version "0.40.2"
+    id("de.fayard.refreshVersions") version "0.60.6"
 }
 
 refreshVersions {
@@ -29,4 +29,4 @@ dependencyResolutionManagement {
 rootProject.name = "ppx"
 
 include(":app")
-include(":xposed-modern-api101-entry")
+include(":xposed-modern-api102-entry")

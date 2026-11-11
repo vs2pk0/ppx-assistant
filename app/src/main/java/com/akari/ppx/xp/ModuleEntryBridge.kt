@@ -9,6 +9,8 @@ import com.akari.ppx.data.XPrefs
 import com.akari.ppx.data.AutomationAvailability
 import com.akari.ppx.utils.HookRuntime
 import com.akari.ppx.utils.Log
+import com.akari.ppx.utils.LogStore
+import com.akari.ppx.utils.RuntimeLog
 import com.akari.ppx.utils.check
 import com.akari.ppx.utils.hookBeforeMethod
 import com.akari.ppx.utils.new
@@ -37,9 +39,12 @@ object ModuleEntryBridge {
     @Volatile var loadedSettingsRevision: String? = null
         private set
 
+    @Volatile private var logBridgeReady = false
+
     @JvmStatic
     fun onLegacyLoadPackage(packageName: String, classLoader: ClassLoader) {
         HookRuntime.useLegacy()
+        installHostLog(packageName)
         if (packageName == APPLICATION_ID) {
             LegacyHookStatusInit.init(classLoader)
             return
@@ -55,8 +60,23 @@ object ModuleEntryBridge {
 
     @JvmStatic
     fun onModernPackageLoaded(module: Any, apiVersion: Int, packageName: String, classLoader: ClassLoader) {
+        installHostLog(packageName)
         HookRuntime.useModern(module, apiVersion)
         handleLoadPackage(packageName, classLoader)
+    }
+
+    /**
+     * The hooked process has no module storage access, so its log lines are
+     * buffered in memory and forwarded to the module provider. [installHostLog]
+     * is idempotent, and passing a real context enables the forwarder.
+     */
+    private fun installHostLog(packageName: String, source: String = "") {
+        val context = runCatching { Init.ctx }.getOrNull()
+        RuntimeLog.install("host", null, context)
+        if (context != null && !logBridgeReady) {
+            logBridgeReady = true
+            Log.i("Entry log bridge ready for $packageName via $source")
+        }
     }
 
     private fun handleLoadPackage(packageName: String, classLoader: ClassLoader) {
@@ -76,6 +96,7 @@ object ModuleEntryBridge {
         fun ensureHooks(context: Context, source: String) {
             if (System.identityHashCode(classLoader) in installedHookLoaders) return
             runCatching {
+                installHostLog(packageName, source)
                 if (hooks.isEmpty()) {
                     Init(context)
                     val info = context.packageManager.getApplicationInfo(APPLICATION_ID, 0)
@@ -105,6 +126,11 @@ object ModuleEntryBridge {
         }
     }
 
+    /** Host app version, so reports can be matched against known-good builds. */
+    private fun targetAppVersion(): String = runCatching {
+        Init.ctx.packageManager.getPackageInfo(TARGET_APP_ID, 0).versionName ?: "?"
+    }.getOrDefault("?")
+
     private fun installHooksOnce(
         packageName: String,
         classLoader: ClassLoader,
@@ -122,6 +148,7 @@ object ModuleEntryBridge {
         }
         Log.i("Entry install hooks from $source size=${hooks.size}")
         loadedSettingsRevision = XPrefs<String>(SETTINGS_REVISION)
+        Log.i("Entry settings revision=${loadedSettingsRevision ?: "unavailable"}")
         hooks.forEach { hook ->
             if (!AutomationAvailability.isHookAvailable(hook.javaClass.name)) {
                 Log.i("Entry skip unavailable automation ${hook.javaClass.name}")
@@ -131,7 +158,9 @@ object ModuleEntryBridge {
                 Log.d("Entry run hook ${hook.javaClass.name}")
                 when (hook) {
                     is SwitchHook -> {
-                        XPrefs<Boolean>(hook.key).check(true) {
+                        val enabled = XPrefs<Boolean>(hook.key)
+                        Log.i("Entry switch ${hook.key}=$enabled")
+                        enabled.check(true) {
                             hook.onHook()
                             installedFeatures.add(hook.key)
                             installedCount++
@@ -145,5 +174,21 @@ object ModuleEntryBridge {
                 Log.e(it)
             }
         }
+        Log.i(
+            "Entry hooks done installed=$installedCount failed=$failedCount" +
+                    " features=${installedFeatures.size}"
+        )
+        // Health report: tells support exactly which configuration channel is
+        // live, and whether the target version has any missing class lookups.
+        Log.i("Entry settings health ${XPrefs.healthReport()}")
+        // Proof that the fallback channel really works, not just that the file exists.
+        runCatching {
+            val probe = XPrefs.snapshotOnly(SETTINGS_REVISION, "") as? String ?: ""
+            Log.i(
+                "Entry snapshot probe revision=${probe.take(8).ifBlank { "none" }}" +
+                        " match=${probe.isNotBlank() && probe == loadedSettingsRevision}"
+            )
+        }.onFailure(Log::e)
+        Log.i("Entry targetApp=${targetAppVersion()}")
     }
 }

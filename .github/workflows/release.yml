@@ -60,8 +60,8 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - name: 安装 Android SDK 36
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: 安装 Android SDK 37
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - name: 恢复发布签名
         env:
@@ -80,7 +80,14 @@ jobs:
       - name: 验证 APK 签名并生成校验值
         run: |
           apk="app/build/outputs/release-dist/皮友助手-v${RELEASE_VERSION}-release.apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          signature=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk")
+          printf '%s\n' "$signature"
+          # Keep public updates installable over existing releases.
+          expected='dc55fab3b9ddf159b05cabe23cc77d428703b552dc020f502511ae8e3fd3e7b6'
+          if ! grep -Fxq "Signer #1 certificate SHA-256 digest: $expected" <<< "$signature"; then
+            echo '签名证书与已发布版本不一致，停止发布'
+            exit 1
+          fi
           cd app/build/outputs/release-dist
           mv "皮友助手-v${RELEASE_VERSION}-release.apk" "piyou-assistant-v${RELEASE_VERSION}-release.apk"
           sha256sum *.apk > SHA256SUMS.txt
