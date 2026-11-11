@@ -110,7 +110,7 @@ Release APK 输出：
 
 ## 下载
 
-已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 和 [LSPosed 收录仓库](https://github.com/Xposed-Modules-Repo/io.github.vs2pk0.piyou/releases) 分发，应用内检查更新以 LSPosed 收录仓库为准。当前版本为 [0.0.12](docs/releases/0.0.12.md)，使用 `0.0.x` 命名，内部版本号保持递增。`0.0.1` 构建在应用更名时取消，未发布安装包。
+已构建版本通过 [GitHub Releases 下载页](https://github.com/vs2pk0/ppx-assistant/releases) 和 [LSPosed 收录仓库](https://github.com/Xposed-Modules-Repo/io.github.vs2pk0.piyou/releases) 分发，应用内检查更新以 LSPosed 收录仓库为准。当前版本为 [0.0.13](docs/releases/0.0.13.md)，使用 `0.0.x` 命名，内部版本号保持递增。`0.0.1` 构建在应用更名时取消，未发布安装包。
 
 发布时先更新 `app/build.gradle.kts` 中的版本名和版本号，再添加 `docs/releases/<版本>.md` 更新说明。推送对应的 `v<版本>` 标签后，Actions 自动运行测试、lint 和签名构建，并发布带中文更新说明的 Release、APK 和 SHA-256 校验文件；Actions 摘要也会显示更新内容。手动运行工作流时填写已存在的版本标签。
 

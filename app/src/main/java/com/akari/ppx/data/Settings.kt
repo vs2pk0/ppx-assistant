@@ -233,9 +233,14 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     summary = "显示已送满评论的送神入口，结果以服务器为准"
                 ),
                 SwitchItem(
+                    key = CommentGod.BUTTON,
+                    title = "显示送神按钮",
+                    summary = "在一级评论和评论详情底栏的点赞旁显示送神。开启后重启皮皮虾。"
+                ),
+                SwitchItem(
                     key = AutoSendGod.ENABLED,
                     title = "自动送神评",
-                    summary = "打开评论区时使用当前账号送神，每帖在本次运行中最多尝试一次。开启后重启皮皮虾。"
+                    summary = "打开评论区时使用当前账号送神并显示结果，每帖在本次运行中最多尝试一次。开启后重启皮皮虾。"
                 ),
                 ListItem(
                     key = AutoSendGod.MODE,
@@ -313,6 +318,11 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     key = "use_feed_footer_new_style",
                     title = "帖子页脚使用新布局",
                     summary = "分享、评论、赞、踩"
+                ),
+                SwitchItem(
+                    key = "show_feed_ward_button",
+                    title = "列表常驻插眼按钮",
+                    summary = "在首页帖子列表的话题栏右侧显示插眼。开启后重启皮皮虾。"
                 ),
                 SwitchItem(
                     key = "modify_interaction_style",
@@ -779,12 +789,12 @@ val settingsCategories: List<SettingsCategory> by lazy {
         SettingsCategory("帖子与内容过滤", "广告屏蔽、帖子过滤与赞踩样式", listOf(
             section("广告过滤", "remove_ads"),
             section("帖子过滤", "remove_feeds", "remove_feeds_keywords", "remove_feeds_users", "remove_official_feeds", "remove_promotional_feeds", "remove_live_feeds"),
-            section("帖子操作栏", "use_feed_footer_new_style", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
+            section("帖子操作栏", "use_feed_footer_new_style", "show_feed_ward_button", "modify_interaction_style", "digg_style", "diss_style", "enable_digg_sound")
         )),
         SettingsCategory("评论与发布", "评论过滤、显示样式、评论能力与发帖", listOf(
             section("评论过滤", "remove_comments", "remove_comments_keywords", "remove_comments_users"),
             section("评论显示", "remove_detail_bottom_view", "enable_old_god_icon_style", "enable_female_prompt", "female_prompt_color", "show_exact_comment_time", "recent_time_format", "exact_time_format"),
-            section("评论功能", "comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_highlight", "unlock_send_god_limit"),
+            section("评论功能", "comment_text_color", "unlock_illegal_words", "unlock_video_comment_limit", "unlock_highlight", "unlock_send_god_limit", CommentGod.BUTTON),
             section("自动送神评", AutoSendGod.ENABLED, AutoSendGod.MODE, AutoSendGod.FLOOR),
             section("发帖功能", "unlock_1080p_limit", "enable_show_location_label")
         )),
