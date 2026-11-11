@@ -1,5 +1,5 @@
 name: 构建并发布 Release
-run-name: 发布 ${{ github.event.inputs.tag || github.ref_name }} · 构建 APK 与更新说明
+run-name: ${{ inputs.build_only && '仅打包' || '发布' }} ${{ github.event.inputs.tag || github.ref_name }} · 构建 APK 与更新说明
 
 on:
   push:
@@ -7,15 +7,19 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 已存在的版本标签，例如 v0.0.1
+        description: APK 版本，例如 v0.0.13。发布时需要同名标签
         required: true
         type: string
+      build_only:
+        description: 从选定分支或标签打包，仅上传 Actions 构建产物
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: ${{ inputs.build_only && 'build' || 'release' }}-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ inputs.build_only && github.sha || github.event.inputs.tag || github.ref_name }}
           persist-credentials: false
       - name: 核对版本并显示更新内容
         shell: bash
@@ -67,7 +71,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.PPX_KEYSTORE_BASE64 }}
         run: |
-          test -n "$KEYSTORE_BASE64" || { echo '缺少 PPX_KEYSTORE_BASE64，停止发布'; exit 1; }
+          test -n "$KEYSTORE_BASE64" || { echo '缺少 PPX_KEYSTORE_BASE64，停止构建'; exit 1; }
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ppx-release.keystore"
       - name: 单元测试、Lint 与 Release 构建
@@ -85,7 +89,7 @@ jobs:
           # Keep public updates installable over existing releases.
           expected='dc55fab3b9ddf159b05cabe23cc77d428703b552dc020f502511ae8e3fd3e7b6'
           if ! grep -Fxq "Signer #1 certificate SHA-256 digest: $expected" <<< "$signature"; then
-            echo '签名证书与已发布版本不一致，停止发布'
+            echo '签名证书与已发布版本不一致，停止构建'
             exit 1
           fi
           cd app/build/outputs/release-dist
@@ -104,12 +108,14 @@ jobs:
           name: ppx-assistant-${{ env.RELEASE_TAG }}
           path: app/build/outputs/release-dist/
       - name: 发布 GitHub Release
+        if: ${{ !inputs.build_only }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$RELEASE_TAG" --verify-tag --title "皮友助手 ${RELEASE_VERSION}" --notes-file "$RELEASE_NOTES" app/build/outputs/release-dist/*
           printf '\n发布成功：[下载 %s](https://github.com/%s/releases/tag/%s)\n' "$RELEASE_TAG" "$GITHUB_REPOSITORY" "$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
       - name: 同步发布到 LSPosed 收录仓库
+        if: ${{ !inputs.build_only }}
         env:
           MODULES_REPO_TOKEN: ${{ secrets.MODULES_REPO_TOKEN }}
         run: |
