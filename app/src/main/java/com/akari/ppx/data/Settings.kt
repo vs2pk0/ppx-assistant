@@ -59,6 +59,11 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     summary = "隐藏启动时的个人信息保护指引"
                 ),
                 SwitchItem(
+                    key = "hide_new_medal_popup",
+                    title = "关闭新徽章弹窗",
+                    summary = "隐藏「获得新徽章」弹窗，开启后重启皮皮虾"
+                ),
+                SwitchItem(
                     key = "simplify_share",
                     title = "精简分享",
                     summary = "移除分享到QQ/QQ空间/微信/朋友圈"
@@ -115,6 +120,11 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     key = "remove_avatar_decoration",
                     title = "屏蔽头像挂饰",
                     summary = "移除活动挂饰"
+                ),
+                SwitchItem(
+                    key = "hide_nickname_medals",
+                    title = "隐藏帖子和评论的昵称徽章",
+                    summary = "隐藏列表创作徽章及作者、评论者的昵称徽章，切换后重启皮皮虾"
                 ),
                 SwitchItem(
                     key = "disable_history_items",
@@ -812,11 +822,11 @@ val settingsCategories: List<SettingsCategory> by lazy {
         )),
         SettingsCategory("我的与个人资料", "我的页入口、用户查询与本机资料", listOf(
             section("我的页入口", "show_mine_settings_entry", "hide_mine_pet_entry", "hide_mine_history_entry", "hide_mine_welfare_entry", "hide_mine_create_center", "hide_mine_more_functions"),
-            section("用户信息", "show_register_escape_time", "unlock_search_user_limits", "remove_avatar_decoration"),
+            section("用户信息", "show_register_escape_time", "unlock_search_user_limits", "remove_avatar_decoration", "hide_nickname_medals"),
             section("本机资料自定义", "customize", "username", "description", "certify_type", "certify_desc", "like_count", "followers_count", "following_count", "point", "enter_black_house")
         )),
         SettingsCategory("启动与隐私", "启动展示、提示弹窗、更新与浏览记录", listOf(
-            section("启动与提示", "skip_splash", "remove_teenager_dialog", "remove_privacy_dialog", "disable_update"),
+            section("启动与提示", "skip_splash", "remove_teenager_dialog", "remove_privacy_dialog", "hide_new_medal_popup", "disable_update"),
             section("浏览记录", "disable_history_items")
         )),
         SettingsCategory("模块与备份", "数据目录、备份恢复、桌面图标与日志", listOf(

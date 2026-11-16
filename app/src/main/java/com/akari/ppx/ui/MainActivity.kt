@@ -64,46 +64,58 @@ class MainActivity : ComponentActivity() {
                 }
                 var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1) }
                 var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+                val showingAbout = selected == com.akari.ppx.data.settingsCategories.size && query.isBlank()
                 androidx.activity.compose.BackHandler(selected != -1) { selected = -1 }
                 Scaffold(
                     modifier = Modifier.background(MaterialTheme.colors.background).safeDrawingPadding(),
                     backgroundColor = MaterialTheme.colors.background,
                     topBar = {
-                        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Image(painterResource(R.drawable.icon), null,
-                                    Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)))
-                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                                    Text("皮友助手", fontSize = 23.sp, fontWeight = FontWeight.Bold)
-                                    Text("让每一次刷虾更顺手", style = MaterialTheme.typography.caption,
-                                        color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
-                                }
-                                TextButton(enabled = !opening, onClick = {
-                                    opening = true
-                                    launchScope.launch {
-                                        try {
-                                            Prefs.flush()
-                                            startPPX(this@MainActivity)
-                                        } catch (error: Exception) {
-                                            this@MainActivity.showToast("设置同步失败，请重试")
-                                        } finally {
-                                            opening = false
-                                        }
-                                    }
-                                }) { Text("打开皮皮虾") }
+                        if (showingAbout) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TextButton(onClick = { selected = -1 }) { Text("‹ 返回") }
+                                Text("关于与支持", style = MaterialTheme.typography.h6)
                             }
-                            Spacer(Modifier.height(16.dp))
-                            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(),
-                                placeholder = { Text("搜索功能，例如：去水印、评论") }, singleLine = true,
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                        } else {
+                            Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Image(painterResource(R.drawable.icon), null,
+                                        Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)))
+                                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                        Text("皮友助手", fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                                        Text("让每一次刷虾更顺手", style = MaterialTheme.typography.caption,
+                                            color = MaterialTheme.colors.onSurface.copy(alpha = .6f))
+                                    }
+                                    TextButton(enabled = !opening, onClick = {
+                                        opening = true
+                                        launchScope.launch {
+                                            try {
+                                                Prefs.flush()
+                                                startPPX(this@MainActivity)
+                                            } catch (error: Exception) {
+                                                this@MainActivity.showToast("设置同步失败，请重试")
+                                            } finally {
+                                                opening = false
+                                            }
+                                        }
+                                    }) { Text("打开皮皮虾") }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                                OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(),
+                                    placeholder = { Text("搜索功能，例如：去水印、评论") }, singleLine = true,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            }
                         }
                     }
                 ) { padding ->
                     Column(Modifier.fillMaxSize().padding(padding)) {
-                        if (selected != -1) TextButton(onClick = { selected = -1 }) { Text("‹ 返回功能分类") }
+                        if (selected != -1 && !showingAbout) TextButton(onClick = { selected = -1 }) { Text("‹ 返回功能分类") }
                         if (query.isNotBlank()) {
                             PreferenceScreen(0, rememberLazyListState(), query)
-                        } else if (selected == com.akari.ppx.data.settingsCategories.size) {
+                        } else if (showingAbout) {
                             AboutScreen(isActiveState.value, checkingUpdate, checkUpdate)
                         } else if (selected >= 0) {
                             PreferenceScreen(selected, rememberLazyListState())
