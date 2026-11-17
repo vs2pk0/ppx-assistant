@@ -19,9 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.akari.ppx.data.*
-import com.akari.ppx.data.Const.CHANNEL_DEFAULT
 import com.akari.ppx.data.Const.CHANNEL_KEY
-import com.akari.ppx.data.model.ChannelItem
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.ui.widget.*
 import com.akari.ppx.utils.fromJsonList
@@ -102,7 +100,7 @@ fun PreferenceItem(
         is Preference.PreferenceItem.ChannelListPreference -> {
             val raw = prefs?.get(stringPreferencesKey(CHANNEL_KEY)) ?: Prefs.get<String>(CHANNEL_KEY)
             val channelItems = androidx.compose.runtime.remember(raw) {
-                raw?.fromJsonList<ChannelItem>()?.toMutableStateList() ?: CHANNEL_DEFAULT.toMutableStateList()
+                readChannelPreferences(raw).toMutableStateList()
             }
             ChannelListPreferenceWidget(
                 preference = preference,

@@ -3,8 +3,10 @@
 package com.akari.ppx.xp.hook.misc
 
 import android.view.View
+import android.view.ViewGroup
 import com.akari.ppx.utils.findClass
 import com.akari.ppx.utils.hookAfterAllConstructors
+import com.akari.ppx.utils.hookAfterAllMethods
 import com.akari.ppx.utils.hookAfterMethod
 import com.akari.ppx.xp.Init.cl
 import com.akari.ppx.xp.hook.SwitchHook
@@ -16,7 +18,7 @@ import com.akari.ppx.xp.hook.SwitchHook
  * only place that creates a tab view, and it receives the spec tag (args[1])
  * plus the resolved label (args[2]).
  */
-private fun hideBottomTabs(vararg tags: String) {
+internal fun hideBottomTabs(vararg tags: String) {
     "com.sup.android.base.main.bottom.b".findClass(cl).hookAfterMethod(
         "a",
         android.content.Context::class.java,
@@ -35,7 +37,7 @@ private fun hideBottomTabs(vararg tags: String) {
 class TopicTabHook : SwitchHook("hide_bottom_topic_tab") {
     // Slot two is "discovery" (话题) or "task" (福利中心) depending on the host's
     // coin-system flag, so both tags hide the same position.
-    override fun onHook() = hideBottomTabs("discovery", "task", "话题", "福利")
+    override fun onHook() = hideBottomTabs("discovery", "task", "话题", "福利", "福利中心")
 }
 
 class MessageTabHook : SwitchHook("hide_bottom_message_tab") {
@@ -56,12 +58,19 @@ class HomeGameEntryHook : SwitchHook("hide_home_game_entry") {
     }
 }
 
-/** MoneyExcitingService adds the coin view before constructing MoneyIconController
- * (runtime class `m_integral.view.d`), so hiding its root also covers re-creation. */
 class CoinFloatBallHook : SwitchHook("hide_coin_float_ball") {
     override fun onHook() {
-        "com.sup.android.m_integral.view.d".findClass(cl).hookAfterAllConstructors { param ->
-            (param.args[0] as? View)?.visibility = View.GONE
+        // Hide the floating views without interrupting the host's task setup.
+        for ((service, tag) in listOf(
+            "MoneyExcitingService" to "view_tag_money_icon",
+            "IntegralService" to "video_channel_float_window"
+        )) {
+            val name = "com.sup.android.m_integral.$service"
+            val type = runCatching { name.findClass(cl) }.getOrNull() ?: continue
+            type.hookAfterAllMethods("addCoinVideoFloatView") { param ->
+                val container = param.args.firstOrNull() as? ViewGroup ?: return@hookAfterAllMethods
+                container.findViewWithTag<View>(tag)?.visibility = View.GONE
+            }
         }
     }
 }

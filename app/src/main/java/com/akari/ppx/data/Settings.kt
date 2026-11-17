@@ -135,7 +135,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     key = "modify_channels",
                     title = "管理频道",
                     dialogTitle = "长按频道进行排序",
-                    summary = "自定义头部板块",
+                    summary = "选择并排序首页频道。部分版本将图片、文字合并为图文",
                 ),
                 ListItem(
                     key = "default_channel",
@@ -545,11 +545,12 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 ItemDivider,
                 SwitchItem(
                     key = "remove_bottom_view",
-                    title = "去除底栏"
+                    title = "去除底栏",
+                    summary = "隐藏首页底部导航，横滑切换频道时保持隐藏"
                 ),
                 SwitchItem(
                     key = "remove_welfare_entry",
-                    title = "隐藏福利入口",
+                    title = "隐藏底栏福利入口",
                     summary = "隐藏底栏中的福利中心入口"
                 ),
                 SwitchItem(
@@ -564,7 +565,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "hide_coin_float_ball",
                     title = "隐藏金币悬浮球",
-                    summary = "隐藏浏览时出现的金币任务悬浮球"
+                    summary = "隐藏首页右侧的金币任务和红包福利悬浮入口"
                 ),
                 SwitchItem(
                     key = "hide_bottom_topic_tab",
