@@ -21,33 +21,25 @@ import org.burnoutcrew.reorderable.*
 @Composable
 fun ChannelListPreferenceWidget(
     preference: Preference.PreferenceItem.ChannelListPreference,
-    value: Boolean,
-    onValueChange: (Boolean) -> Unit,
     items: SnapshotStateList<ChannelItem>,
     onDismiss: () -> Unit
 ) {
     var isDialogShown by rememberState(value = false)
-    SwitchPreferenceWidget(
-        preference = preference,
-        value = value,
-        onValueChange = {
-            onValueChange(it)
-            isDialogShown = it
-        },
-    )
+    TextPreferenceWidget(preference = preference, onClick = { isDialogShown = true })
     if (isDialogShown) {
+        val dismiss = {
+            onDismiss()
+            isDialogShown = false
+        }
         AlertDialog(
-            onDismissRequest = {
-                onDismiss()
-                isDialogShown = !isDialogShown
-            },
+            onDismissRequest = dismiss,
             title = {
                 Text(
                     text = preference.dialogTitle,
                     color = MaterialTheme.colors.primary
                 )
             },
-            buttons = {},
+            confirmButton = { TextButton(onClick = dismiss) { Text("完成") } },
             text = {
                 val state = rememberReorderState()
                 LazyColumn(

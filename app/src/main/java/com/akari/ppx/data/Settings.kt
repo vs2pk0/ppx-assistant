@@ -3,6 +3,7 @@ package com.akari.ppx.data
 import android.content.Context
 import com.akari.ppx.data.Const.CATEGORY_NAMES
 import com.akari.ppx.data.Const.CATEGORY_TYPES
+import com.akari.ppx.data.Const.CHANNEL_KEY
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.utils.hideIcon
 import com.akari.ppx.utils.FemalePromptColors
@@ -131,8 +132,13 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     title = "关闭浏览历史记录",
                     summary = "不再记录浏览历史"
                 ),
-                ChannelListItem(
+                SwitchItem(
                     key = "modify_channels",
+                    title = "启用自定义频道",
+                    summary = "按管理频道中保存的顺序显示，切换后重启皮皮虾"
+                ),
+                ChannelListItem(
+                    key = CHANNEL_KEY,
                     title = "管理频道",
                     dialogTitle = "长按频道进行排序",
                     summary = "选择并排序首页频道。部分版本将图片、文字合并为图文",
@@ -560,7 +566,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "hide_home_game_entry",
                     title = "隐藏游戏入口",
-                    summary = "隐藏首页右上角的小游戏入口"
+                    summary = "隐藏首页右上角的小游戏图标，切换后重启皮皮虾"
                 ),
                 SwitchItem(
                     key = "hide_coin_float_ball",
@@ -792,7 +798,7 @@ val settingsCategories: List<SettingsCategory> by lazy {
     )
     listOf(
         SettingsCategory("首页与导航", "频道排序、首页入口、底部导航与红点", listOf(
-            section("频道与布局", "modify_channels", "default_channel", "enable_double_layout_style"),
+            section("频道与布局", "modify_channels", CHANNEL_KEY, "default_channel", "enable_double_layout_style"),
             section("首页入口", "remove_stories", "hide_home_game_entry", "hide_coin_float_ball"),
             section("底部导航", "remove_bottom_view", "hide_bottom_topic_tab", "hide_bottom_message_tab", "remove_welfare_entry", "remove_publish_button"),
             section("红点与角标", "remove_red_dots", "modify_message_counts")

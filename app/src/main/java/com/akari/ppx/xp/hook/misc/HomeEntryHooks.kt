@@ -2,7 +2,9 @@
 
 package com.akari.ppx.xp.hook.misc
 
+import android.os.Bundle
 import android.os.Looper
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import com.akari.ppx.utils.findClass
@@ -45,16 +47,24 @@ class MessageTabHook : SwitchHook("hide_bottom_message_tab") {
     override fun onHook() = hideBottomTabs("message", "消息")
 }
 
-/** The home top-bar game icon is created solely by MiniGameHelper (dex
- * `feedui.util.aa`; constructor receives the stub and icon view ids). */
 class HomeGameEntryHook : SwitchHook("hide_home_game_entry") {
     override fun onHook() {
-        "com.sup.superb.feedui.util.aa".findClass(cl).hookAfterAllConstructors { param ->
-            val container = param.args[0] as? View ?: return@hookAfterAllConstructors
-            val stubId = param.args[1] as? Int ?: return@hookAfterAllConstructors
-            val iconId = param.args[2] as? Int ?: return@hookAfterAllConstructors
-            container.findViewById<View>(stubId)?.visibility = View.GONE
-            container.findViewById<View>(iconId)?.visibility = View.GONE
+        val ids = "com.sup.android.superb.R\$id".findClass(cl)
+        val gameIds = listOf("tab_mini_game_icon_vs", "tab_mini_game_icon").map {
+            ids.getField(it).getInt(null)
+        }
+        "com.sup.superb.feedui.view.tabv2.FeedTabFragmentV2".findClass(cl).hookAfterMethod(
+            "onCreateView",
+            LayoutInflater::class.java,
+            ViewGroup::class.java,
+            Bundle::class.java
+        ) { param ->
+            val header = param.result as? View ?: return@hookAfterMethod
+            // Remove the slot before MiniGameHelper can inflate it in onActivityCreated.
+            for (id in gameIds) {
+                val entry = header.findViewById<View>(id) ?: continue
+                (entry.parent as? ViewGroup)?.removeView(entry)
+            }
         }
     }
 }

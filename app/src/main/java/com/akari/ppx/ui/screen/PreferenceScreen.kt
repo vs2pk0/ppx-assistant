@@ -16,10 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.akari.ppx.data.*
-import com.akari.ppx.data.Const.CHANNEL_KEY
 import com.akari.ppx.data.model.CheckBoxItem
 import com.akari.ppx.ui.widget.*
 import com.akari.ppx.utils.fromJsonList
@@ -98,19 +96,15 @@ fun PreferenceItem(
             )
         }
         is Preference.PreferenceItem.ChannelListPreference -> {
-            val raw = prefs?.get(stringPreferencesKey(CHANNEL_KEY)) ?: Prefs.get<String>(CHANNEL_KEY)
+            val raw = prefs?.get(stringPreferencesKey(preference.key)) ?: Prefs.get<String>(preference.key)
             val channelItems = androidx.compose.runtime.remember(raw) {
                 readChannelPreferences(raw).toMutableStateList()
             }
             ChannelListPreferenceWidget(
                 preference = preference,
-                value = prefs?.get(booleanPreferencesKey(preference.key)) ?: false,
-                onValueChange = { newValue ->
-                    Prefs.set(preference.key, newValue)
-                },
                 items = channelItems,
                 onDismiss = {
-                    Prefs.set(CHANNEL_KEY, channelItems.toJson())
+                    Prefs.set(preference.key, channelItems.toJson())
                 }
             )
         }
