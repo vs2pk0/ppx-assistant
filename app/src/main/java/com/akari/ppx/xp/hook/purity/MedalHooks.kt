@@ -24,7 +24,8 @@ class NicknameMedalsHook : SwitchHook("hide_nickname_medals") {
             "detail_item_user_medal_enter",
             "comment_user_medal_mev",
             "detail_comment_user_medal_mev",
-            "feedui_mev_cell_part_god_comment_medal"
+            "feedui_mev_cell_part_god_comment_medal",
+            "profile_mev_medal_container"
         ).mapNotNull { name ->
             try {
                 ids.getField(name).getInt(null)

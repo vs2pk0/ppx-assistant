@@ -34,7 +34,7 @@ class FeedWardButtonHook : SwitchHook(KEY) {
             if (!itemCell.isInstance(cell)) return false
             val provider = context.callMethodOrNull("getDockerDependency", listInfo)
             val listId = provider.callMethodOrNullAs<String>("getListId") ?: return false
-            if (!FEED_LIST.matches(listId)) return false
+            if (!POST_LIST.matches(listId)) return false
             val item = cell.callMethodOrNull("getFeedItem")
             if (item.callMethodOrNull("getWardInfo") == null) return false
             val origin = dependencies.callMethodOrNull("a", originItem)
@@ -85,6 +85,6 @@ class FeedWardButtonHook : SwitchHook(KEY) {
 
     companion object {
         const val KEY = "show_feed_ward_button"
-        private val FEED_LIST = Regex("feed_-?\\d+_-?\\d+")
+        private val POST_LIST = Regex("(?:feed|moments|contributions|userwards)_-?\\d+_-?\\d+")
     }
 }

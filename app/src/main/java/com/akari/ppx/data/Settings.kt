@@ -124,7 +124,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "hide_nickname_medals",
                     title = "隐藏帖子和评论的昵称徽章",
-                    summary = "隐藏列表创作徽章及作者、评论者的昵称徽章，切换后重启皮皮虾"
+                    summary = "隐藏帖子和评论的昵称徽章及他人主页的徽章，切换后重启皮皮虾"
                 ),
                 SwitchItem(
                     key = "disable_history_items",
@@ -332,7 +332,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "show_feed_ward_button",
                     title = "列表常驻插眼按钮",
-                    summary = "在首页帖子列表的话题栏右侧显示插眼。开启后重启皮皮虾。"
+                    summary = "在首页和个人主页的帖子列表右侧显示插眼，切换后重启皮皮虾"
                 ),
                 SwitchItem(
                     key = "modify_interaction_style",

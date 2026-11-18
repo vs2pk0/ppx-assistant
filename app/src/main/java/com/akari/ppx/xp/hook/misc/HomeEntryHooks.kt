@@ -2,6 +2,7 @@
 
 package com.akari.ppx.xp.hook.misc
 
+import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import com.akari.ppx.utils.findClass
@@ -70,6 +71,26 @@ class CoinFloatBallHook : SwitchHook("hide_coin_float_ball") {
             type.hookAfterAllMethods("addCoinVideoFloatView") { param ->
                 val container = param.args.firstOrNull() as? ViewGroup ?: return@hookAfterAllMethods
                 container.findViewWithTag<View>(tag)?.visibility = View.GONE
+            }
+        }
+
+        // FeedDurationEntranceMgr draws the reading reward in its own wrapper.
+        val durationManager = runCatching {
+            "com.sup.superb.feedui.util.j".findClass(cl)
+        }.getOrNull() ?: return
+        val wrapperField = durationManager.declaredFields.singleOrNull {
+            it.type == ViewGroup::class.java
+        }?.apply { isAccessible = true } ?: return
+        durationManager.hookAfterAllConstructors { param ->
+            if (param.args.firstOrNull()?.javaClass?.name != "com.sup.superb.feedui.view.tabv2.FeedTabFragmentV2") {
+                return@hookAfterAllConstructors
+            }
+            val wrapper = wrapperField.get(param.thisObject) as? ViewGroup ?: return@hookAfterAllConstructors
+            // Keep the wrapper measured. The host repositions and shows its child on channel changes.
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                wrapper.visibility = View.INVISIBLE
+            } else {
+                wrapper.post { wrapper.visibility = View.INVISIBLE }
             }
         }
     }
