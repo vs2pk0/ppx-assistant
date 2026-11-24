@@ -42,7 +42,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = "remove_stories",
                     title = "去除头像列表",
-                    summary = "去除推荐/关注频道下方头像列表"
+                    summary = "隐藏推荐和关注频道顶部的横向头像栏，切换后重启皮皮虾"
                 ),
                 SwitchItem(
                     key = "disable_update",
@@ -256,7 +256,7 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                 SwitchItem(
                     key = AutoSendGod.ENABLED,
                     title = "自动送神评",
-                    summary = "打开评论区时使用当前账号送神并显示结果，每帖在本次运行中最多尝试一次。开启后重启皮皮虾。"
+                    summary = "打开评论区时自动送神，每帖在本次运行中最多尝试一次。已有至少 2 条神评时跳过。开启后重启皮皮虾。"
                 ),
                 ListItem(
                     key = AutoSendGod.MODE,
@@ -564,6 +564,11 @@ val prefItems: List<List<PrefItem?>> = (0..3).map { index ->
                     title = "去除发布按钮"
                 ),
                 SwitchItem(
+                    key = "hide_home_search_entry",
+                    title = "隐藏首页搜索入口",
+                    summary = "隐藏首页右上角的放大镜图标，切换后重启皮皮虾"
+                ),
+                SwitchItem(
                     key = "hide_home_game_entry",
                     title = "隐藏游戏入口",
                     summary = "隐藏首页右上角的小游戏图标，切换后重启皮皮虾"
@@ -799,7 +804,7 @@ val settingsCategories: List<SettingsCategory> by lazy {
     listOf(
         SettingsCategory("首页与导航", "频道排序、首页入口、底部导航与红点", listOf(
             section("频道与布局", "modify_channels", CHANNEL_KEY, "default_channel", "enable_double_layout_style"),
-            section("首页入口", "remove_stories", "hide_home_game_entry", "hide_coin_float_ball"),
+            section("首页入口", "hide_home_search_entry", "remove_stories", "hide_home_game_entry", "hide_coin_float_ball"),
             section("底部导航", "remove_bottom_view", "hide_bottom_topic_tab", "hide_bottom_message_tab", "remove_welfare_entry", "remove_publish_button"),
             section("红点与角标", "remove_red_dots", "modify_message_counts")
         )),

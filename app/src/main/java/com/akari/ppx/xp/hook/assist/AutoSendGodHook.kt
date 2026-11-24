@@ -12,6 +12,7 @@ import com.akari.ppx.utils.callMethodOrNullAs
 import com.akari.ppx.utils.hookAfterMethod
 import com.akari.ppx.utils.showToast
 import com.akari.ppx.xp.hook.SwitchHook
+import com.akari.ppx.xp.hook.purity.CommentHook
 import java.util.WeakHashMap
 
 @Suppress("unused")
@@ -22,6 +23,7 @@ class AutoSendGodHook : SwitchHook(AutoSendGod.ENABLED) {
         val dockerContext = adapterClass.getDeclaredField("c").apply { isAccessible = true }
         val fragmentClass = hostClass("com.sup.android.m_comment.view.CommentFragment")
         val commentParams = fragmentClass.getDeclaredField("l").apply { isAccessible = true }
+        val pendingResult = fragmentClass.getDeclaredField("B").apply { isAccessible = true }
         val commentCell = hostClass("com.sup.android.mi.feed.repo.bean.comment.CommentFeedCell")
         val main = Handler(Looper.getMainLooper())
         val attemptedPosts = mutableSetOf<Long>()
@@ -46,6 +48,11 @@ class AutoSendGodHook : SwitchHook(AutoSendGod.ENABLED) {
             val comments = rows.mapNotNull { CommentGodAction.row(it.callMethodOrNull("getCellData")) }
                 .distinctBy { it.id }
             if (comments.isEmpty() || comments.any { it.postId != postId }) return@hookAfterMethod
+
+            // The fragment clears this reference after appending the batch to the adapter.
+            val response = pendingResult.get(fragment).callMethodOrNull("getData")
+            val loadedCells = CommentHook.unfilteredComments(response)
+                ?: response.callMethodOrNullAs<List<*>>("b")
             val batch = PendingBatch(postId, view)
 
             fun runWhenVisible(retries: Int) {
@@ -71,11 +78,27 @@ class AutoSendGodHook : SwitchHook(AutoSendGod.ENABLED) {
                         return@runCatching
                     }
 
+                    firstBatches.remove(adapter)
+                    attemptedPosts.add(postId)
+                    val loadedComments = loadedCells?.asSequence()?.mapNotNull(CommentGodAction::row)
+                        ?: comments.asSequence()
+                    val featuredComments = params.callMethodOrNull("d")
+                        .callMethodOrNull("getFeedItem")
+                        .callMethodOrNullAs<List<*>>("getComments").orEmpty()
+                    val existingComments = loadedComments.filter { it.postId == postId }.map { it.comment } +
+                        featuredComments.asSequence()
+                    val godIds = existingComments
+                        .filter { it.callMethodOrNullAs<Boolean>("isGodComment") == true }
+                        .mapNotNull { it.callMethodOrNullAs<Long>("getCommentId") }
+                    if (AutoSendGod.hasEnoughGodComments(godIds)) {
+                        Log.i("AutoSendGod skipped: post already has at least two god comments")
+                        view.context.showToast("自动送神 · 已有至少 2 条神评，已跳过")
+                        return@runCatching
+                    }
+
                     val mode = XPrefs(AutoSendGod.MODE, AutoSendGod.FIRST)
                     val likes = comments.map { it.comment.callMethodOrNullAs<Long>("getLikeCount") }
                     val index = AutoSendGod.selectIndex(likes, mode, XPrefs(AutoSendGod.FLOOR, "1"))
-                    firstBatches.remove(adapter)
-                    attemptedPosts.add(postId)
                     if (index == null) {
                         view.context.showToast("自动送神 · 首批评论中未找到目标")
                         return@runCatching

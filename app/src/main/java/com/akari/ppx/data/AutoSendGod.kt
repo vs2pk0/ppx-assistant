@@ -9,6 +9,11 @@ internal object AutoSendGod {
     const val MOST_LIKED = "most_liked"
     const val SPECIFIED = "specified"
 
+    private const val GOD_COMMENT_LIMIT = 2
+
+    fun hasEnoughGodComments(ids: Sequence<Long>): Boolean =
+        ids.filter { it > 0 }.distinct().take(GOD_COMMENT_LIMIT).count() == GOD_COMMENT_LIMIT
+
     fun selectIndex(likes: List<Long?>, mode: String, floor: String): Int? {
         val index = when (mode) {
             FIRST -> 0

@@ -8,9 +8,13 @@ import com.akari.ppx.xp.hook.SwitchHook
 
 class StoryHook : SwitchHook("remove_stories") {
     override fun onHook() {
-        "com.sup.android.mi.feed.repo.bean.cell.StoryInfo".replaceMethod(
+        // StoryManager adds this header in both the recommendation and following feeds.
+        "com.sup.superb.feedui.repo.g".replaceMethod(
             cl,
-            "getStoryList"
+            "a",
+            String::class.java,
+            "com.sup.android.mi.feed.repo.bean.cell.StoryInfo",
+            ArrayList::class.java
         ) { null }
     }
 }

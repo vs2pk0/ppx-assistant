@@ -47,19 +47,33 @@ class MessageTabHook : SwitchHook("hide_bottom_message_tab") {
     override fun onHook() = hideBottomTabs("message", "消息")
 }
 
+private fun onHomeHeaderCreated(onCreated: (View) -> Unit) {
+    "com.sup.superb.feedui.view.tabv2.FeedTabFragmentV2".findClass(cl).hookAfterMethod(
+        "onCreateView",
+        LayoutInflater::class.java,
+        ViewGroup::class.java,
+        Bundle::class.java
+    ) { param ->
+        (param.result as? View)?.let(onCreated)
+    }
+}
+
+class HomeSearchEntryHook : SwitchHook("hide_home_search_entry") {
+    override fun onHook() {
+        val searchId = "com.sup.android.superb.R\$id".findClass(cl).getField("tab_search_view").getInt(null)
+        onHomeHeaderCreated { header ->
+            header.findViewById<View>(searchId)?.visibility = View.GONE
+        }
+    }
+}
+
 class HomeGameEntryHook : SwitchHook("hide_home_game_entry") {
     override fun onHook() {
         val ids = "com.sup.android.superb.R\$id".findClass(cl)
         val gameIds = listOf("tab_mini_game_icon_vs", "tab_mini_game_icon").map {
             ids.getField(it).getInt(null)
         }
-        "com.sup.superb.feedui.view.tabv2.FeedTabFragmentV2".findClass(cl).hookAfterMethod(
-            "onCreateView",
-            LayoutInflater::class.java,
-            ViewGroup::class.java,
-            Bundle::class.java
-        ) { param ->
-            val header = param.result as? View ?: return@hookAfterMethod
+        onHomeHeaderCreated { header ->
             // Remove the slot before MiniGameHelper can inflate it in onActivityCreated.
             for (id in gameIds) {
                 val entry = header.findViewById<View>(id) ?: continue

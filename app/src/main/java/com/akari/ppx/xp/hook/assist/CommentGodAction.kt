@@ -127,10 +127,11 @@ internal object CommentGodAction {
 
 internal fun hostClass(name: String): Class<*> = Class.forName(name, false, cl)
 
+private val supportedActionVersions = setOf("6.5.5", "6.6.1", "6.6.5")
+
 internal fun supportsCommentActions(feature: String): Boolean {
     val version = ctx.packageManager.getPackageInfo(TARGET_APP_ID, 0).versionName
-    // The reflection signatures below are verified on these host versions.
-    return (version == "6.5.5" || version == "6.6.1").also {
+    return (version in supportedActionVersions).also {
         if (!it) Log.w("$feature unsupported host=$version")
     }
 }

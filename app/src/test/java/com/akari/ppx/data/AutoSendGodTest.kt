@@ -1,11 +1,25 @@
 package com.akari.ppx.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutoSendGodTest {
     private val likes = listOf(2L, 15L, 15L, 4L)
+
+    @Test fun skipsPostsWithAtLeastTwoGodComments() {
+        assertFalse(AutoSendGod.hasEnoughGodComments(emptySequence()))
+        assertFalse(AutoSendGod.hasEnoughGodComments(sequenceOf(12L)))
+        assertTrue(AutoSendGod.hasEnoughGodComments(sequenceOf(12L, 34L)))
+        assertTrue(AutoSendGod.hasEnoughGodComments(sequenceOf(12L, 34L, 56L)))
+    }
+
+    @Test fun countsOnlyDistinctValidGodCommentIds() {
+        assertFalse(AutoSendGod.hasEnoughGodComments(sequenceOf(12L, 0L, 12L, -1L)))
+        assertTrue(AutoSendGod.hasEnoughGodComments(sequenceOf(12L, 12L, 34L)))
+    }
 
     @Test fun selectsFirstAndSpecifiedFloorsInDisplayOrder() {
         assertEquals(0, AutoSendGod.selectIndex(likes, AutoSendGod.FIRST, "4"))
